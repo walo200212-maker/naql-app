@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "874666026525",
+    "firebase_url": "https://naql-bc9e3-default-rtdb.firebaseio.com",
+    "project_id": "naql-bc9e3",
+    "storage_bucket": "naql-bc9e3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:874666026525:android:1ca4e239d25e5d8fef08f4",
+        "android_client_info": {
+          "package_name": "com.naql.naql_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "874666026525-7oesdd9unl9l1g8mqun0va6tol1hfque.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDty0zW6nV-NhavO1CtqBpSSHTPII-jpcM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "874666026525-7oesdd9unl9l1g8mqun0va6tol1hfque.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
