@@ -30,7 +30,9 @@ Future<void> main() async {
   // Run `flutterfire configure` to auto-generate firebase_options.dart if preferred.
   await Firebase.initializeApp();
 
-  await NotificationService().init();
+  try {
+    await NotificationService().init().timeout(const Duration(seconds: 5));
+  } catch (_) {}
 
   runApp(const NaqlApp());
 }
