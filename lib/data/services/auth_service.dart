@@ -17,11 +17,18 @@ class AuthService {
   // Stores web confirmation result for OTP verification
   ConfirmationResult? _webConfirmationResult;
 
-  /// Send OTP — uses web-compatible path on Flutter web
+  /// Send OTP — uses web-compatible path on Flutter web.
+  ///
+  /// `onCodeSent`/`onError`/`onAutoVerified` fire asynchronously, well after
+  /// this future completes (Firebase's `verifyPhoneNumber` resolves once the
+  /// listeners are registered, not once an SMS is actually sent). Callers
+  /// must wait for one of those callbacks before navigating to the OTP entry
+  /// screen — otherwise `verificationId` won't be ready yet.
   Future<void> sendOtp({
     required String phoneNumber,
     required Function(String verificationId) onCodeSent,
     required Function(String error) onError,
+    Function()? onAutoVerified,
   }) async {
     if (kIsWeb) {
       try {
@@ -39,6 +46,7 @@ class AuthService {
         timeout: const Duration(seconds: 60),
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
+          onAutoVerified?.call();
         },
         verificationFailed: (FirebaseAuthException e) {
           onError(e.message ?? 'خطأ في التحقق');

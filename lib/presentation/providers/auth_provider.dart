@@ -19,6 +19,7 @@ class AuthProvider extends ChangeNotifier {
   UserModel? _user;
   DriverModel? _driver;
   String? _verificationId;
+  bool _autoVerified = false;
   bool _isLoading = false;
   String? _error;
   StreamSubscription<Position>? _locationSub;
@@ -59,17 +60,54 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// Sends the OTP and waits until Firebase has either issued a
+  /// `verificationId`, reported an error, or auto-verified the device —
+  /// whichever comes first. Without this wait, callers would navigate to the
+  /// OTP entry screen before `_verificationId` is set, causing every code
+  /// to be rejected as incorrect.
   Future<void> sendOtp(String phoneNumber) async {
     _setLoading(true);
-    await _authService.sendOtp(
-      phoneNumber: phoneNumber,
-      onCodeSent: (id) {
-        _verificationId = id;
-        _setLoading(false);
-      },
-      onError: (e) {
-        _error = e;
-        _setLoading(false);
+    _error = null;
+    _verificationId = null;
+    _autoVerified = false;
+    final completer = Completer<void>();
+
+    void complete() {
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    try {
+      await _authService.sendOtp(
+        phoneNumber: phoneNumber,
+        onCodeSent: (id) {
+          _verificationId = id;
+          _setLoading(false);
+          complete();
+        },
+        onError: (e) {
+          _error = e;
+          _setLoading(false);
+          complete();
+        },
+        onAutoVerified: () {
+          _autoVerified = true;
+          _setLoading(false);
+          complete();
+        },
+      );
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      complete();
+    }
+
+    await completer.future.timeout(
+      const Duration(seconds: 60),
+      onTimeout: () {
+        if (_isLoading) {
+          _error = 'انتهت المهلة، حاول مجدداً';
+          _setLoading(false);
+        }
       },
     );
   }
@@ -125,6 +163,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> verifyOtp(String code) async {
+    // Android sometimes auto-verifies via the SMS Retriever API before the
+    // user finishes typing — the user is already signed in, so any code
+    // they enter (or paste) should be accepted.
+    if (_autoVerified) return true;
     if (_verificationId == null) return false;
     _setLoading(true);
     try {

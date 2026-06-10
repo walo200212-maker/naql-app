@@ -28,6 +28,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   LatLng _center = const LatLng(33.5731, -7.5898); // Casablanca default
   int _selectedTab = 0;
 
+  // `myLocationEnabled` must stay false until permission is confirmed —
+  // enabling it before the OS grants ACCESS_FINE/COARSE_LOCATION throws a
+  // PlatformException on Android that prevents the GoogleMap view from
+  // rendering at all.
+  bool _locationGranted = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,8 +46,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Future<void> _initLocation() async {
     try {
-      final perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied) return;
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
+      if (mounted) setState(() => _locationGranted = true);
       final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
       setState(() => _center = LatLng(pos.latitude, pos.longitude));
@@ -65,6 +78,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             children: [
               _HomeTab(
                 center: _center,
+                locationEnabled: _locationGranted,
                 onMapCreated: (c) => _mapController = c,
                 onMyLocation: _goToMyLocation,
               ),
@@ -117,11 +131,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
 class _HomeTab extends StatelessWidget {
   final LatLng center;
+  final bool locationEnabled;
   final void Function(GoogleMapController) onMapCreated;
   final VoidCallback onMyLocation;
 
   const _HomeTab({
     required this.center,
+    required this.locationEnabled,
     required this.onMapCreated,
     required this.onMyLocation,
   });
@@ -137,7 +153,7 @@ class _HomeTab extends StatelessWidget {
           GoogleMap(
             initialCameraPosition: CameraPosition(target: center, zoom: 13),
             onMapCreated: onMapCreated,
-            myLocationEnabled: true,
+            myLocationEnabled: locationEnabled,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             compassEnabled: false,
