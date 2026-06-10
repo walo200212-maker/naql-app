@@ -15,6 +15,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../widgets/common/status_badge.dart';
 import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_bottom_nav.dart';
+import 'home_content_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -76,13 +78,14 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           IndexedStack(
             index: _selectedTab,
             children: [
+              const HomeContentScreen(),
+              const _HistoryTab(),
               _HomeTab(
                 center: _center,
                 locationEnabled: _locationGranted,
                 onMapCreated: (c) => _mapController = c,
                 onMyLocation: _goToMyLocation,
               ),
-              const _HistoryTab(),
               const _ProfileTab(),
             ],
           ),
@@ -95,7 +98,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_selectedTab == 0) ...[
+                if (_selectedTab == 2) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 10),
@@ -114,8 +117,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                           curve: Curves.easeOutCubic)
                       .fadeIn(duration: 350.ms, delay: 300.ms),
                 ],
-                _FloatingBottomNav(
-                  current: _selectedTab,
+                WaslBottomNav(
+                  currentIndex: _selectedTab,
                   onTap: (i) => setState(() => _selectedTab = i),
                 ),
               ],
@@ -516,119 +519,6 @@ class _ProfileTab extends StatelessWidget {
             ],
           ).animate(delay: 150.ms).fadeIn(duration: 400.ms),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Floating bottom nav ──────────────────────────────────────────────────────
-
-class _FloatingBottomNav extends StatelessWidget {
-  final int current;
-  final ValueChanged<int> onTap;
-
-  const _FloatingBottomNav({required this.current, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.88),
-            border: Border(
-              top: BorderSide(
-                  color: AppColors.surfaceBorder.withValues(alpha: 0.6)),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              children: [
-                _NavItem(
-                    icon: Icons.home_rounded,
-                    label: 'الرئيسية',
-                    selected: current == 0,
-                    onTap: () => onTap(0)),
-                _NavItem(
-                    icon: Icons.inventory_2_rounded,
-                    label: 'طلباتي',
-                    selected: current == 1,
-                    onTap: () => onTap(1)),
-                _NavItem(
-                    icon: Icons.person_rounded,
-                    label: 'حسابي',
-                    selected: current == 2,
-                    onTap: () => onTap(2)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primaryGlow
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  icon,
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.textHint,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: AppTextStyles.caption.copyWith(
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.textHint,
-                  fontWeight: selected
-                      ? FontWeight.w700
-                      : FontWeight.w400,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
