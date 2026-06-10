@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
@@ -12,6 +13,8 @@ import '../../../data/models/offer_model.dart';
 import '../../../data/models/driver_model.dart';
 import '../../../data/services/firestore_service.dart';
 import '../../providers/job_provider.dart';
+import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_shimmer.dart';
 
 class DriverOffersScreen extends StatefulWidget {
   final String jobId;
@@ -62,45 +65,45 @@ class _DriverOffersScreenState extends State<DriverOffersScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('${offers.length} offre(s)'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
+        title: Text(
+          offers.isEmpty ? 'عروض السائقين' : '${offers.length} عرض',
+          style: AppTextStyles.h3,
+        ),
+        centerTitle: true,
       ),
       body: offers.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.hourglass_empty_rounded,
-                      size: 72, color: AppColors.textHint),
-                  const SizedBox(height: 16),
-                  Text('En attente d\'offres', style: AppTextStyles.h3),
-                  const SizedBox(height: 8),
-                  Text('Les chauffeurs à proximité\nvont bientôt répondre',
-                      style: AppTextStyles.bodySecondary,
-                      textAlign: TextAlign.center),
-                ],
-              ),
-            )
+          ? _EmptyState()
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               itemCount: offers.length,
               itemBuilder: (_, i) {
                 final offer = offers[i];
                 return FutureBuilder<DriverModel?>(
                   future: _fetchDriver(offer.driverId),
                   builder: (_, snap) {
-                    final driver = snap.data;
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: WaslShimmerList(count: 1),
+                      );
+                    }
                     return _OfferCard(
                       offer: offer,
-                      driver: driver,
+                      driver: snap.data,
                       onSelect: () => _selectDriver(offer),
-                      onWhatsApp: driver != null
-                          ? () => _openWhatsApp(driver.phone)
+                      onWhatsApp: snap.data != null
+                          ? () => _openWhatsApp(snap.data!.phone)
                           : null,
-                    ).animate(delay: (i * 80).ms).fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0);
+                    )
+                        .animate(delay: Duration(milliseconds: i * 80))
+                        .fadeIn(duration: 400.ms)
+                        .slideY(begin: 0.08, end: 0);
                   },
                 );
               },
@@ -108,6 +111,44 @@ class _DriverOffersScreenState extends State<DriverOffersScreen> {
     );
   }
 }
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.surfaceBorder),
+            ),
+            child: const Icon(Icons.hourglass_empty_rounded,
+                size: 44, color: AppColors.textHint),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scaleXY(begin: 1, end: 1.06, duration: 1400.ms),
+          const SizedBox(height: 20),
+          Text('في انتظار العروض', style: AppTextStyles.h3),
+          const SizedBox(height: 8),
+          Text(
+            'السائقون القريبون منك\nسيردون قريباً',
+            style: AppTextStyles.bodySecondary,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Offer card ───────────────────────────────────────────────────────────────
 
 class _OfferCard extends StatelessWidget {
   final OfferModel offer;
@@ -127,60 +168,40 @@ class _OfferCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Column(
         children: [
-          // Header
+          // Header row
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Truck photo
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(13),
                   child: driver?.truckPhotoUrl.isNotEmpty == true
                       ? CachedNetworkImage(
                           imageUrl: driver!.truckPhotoUrl,
-                          width: 72,
-                          height: 72,
+                          width: 76,
+                          height: 76,
                           fit: BoxFit.cover,
-                          placeholder: (_, _) => Container(
-                            width: 72,
-                            height: 72,
-                            color: AppColors.surfaceVariant,
-                            child: const Icon(Icons.local_shipping_rounded,
-                                color: AppColors.primary),
-                          ),
-                          errorWidget: (_, _, _) => Container(
-                            width: 72,
-                            height: 72,
-                            color: AppColors.surfaceVariant,
-                            child: const Icon(Icons.local_shipping_rounded,
-                                color: AppColors.primary),
-                          ),
+                          placeholder: (_, _) => _TruckPlaceholder(),
+                          errorWidget: (_, _, _) => _TruckPlaceholder(),
                         )
-                      : Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.local_shipping_rounded,
-                              color: AppColors.primary, size: 36),
-                        ),
+                      : _TruckPlaceholder(),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(driver?.name ?? 'Chauffeur',
+                      Text(driver?.name ?? 'سائق',
                           style: AppTextStyles.bodyLarge),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       if (driver != null) ...[
                         Text(driver!.truckType,
                             style: AppTextStyles.bodySecondary),
@@ -191,29 +212,35 @@ class _OfferCard extends StatelessWidget {
                               Icons.star_rounded,
                               color: AppColors.warning),
                           itemCount: 5,
-                          itemSize: 16,
+                          itemSize: 15,
                         ),
-                        Text('${driver!.totalJobs} missions',
+                        const SizedBox(height: 2),
+                        Text('${driver!.totalJobs} رحلة',
                             style: AppTextStyles.caption),
                       ],
                     ],
                   ),
                 ),
+                // Price
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       offer.totalPrice.toStringAsFixed(0),
-                      style: AppTextStyles.price,
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    Text('MAD', style: AppTextStyles.caption),
+                    Text('درهم', style: AppTextStyles.caption),
                   ],
                 ),
               ],
             ),
           ),
 
-          // Commission info
+          // Payment info strip
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -223,48 +250,58 @@ class _OfferCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.textSecondary, size: 14),
+                const Icon(Icons.payments_outlined,
+                    color: AppColors.textHint, size: 14),
                 const SizedBox(width: 8),
                 Text(
-                  'Vous payez ${offer.totalPrice.toStringAsFixed(0)} MAD en cash au chauffeur',
+                  'تدفع ${offer.totalPrice.toStringAsFixed(0)} درهم نقداً للسائق',
                   style: AppTextStyles.caption,
                 ),
               ],
             ),
           ),
 
-          // Actions
+          const SizedBox(height: 14),
+
+          // Action buttons
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
-                if (onWhatsApp != null)
+                if (onWhatsApp != null) ...[
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onWhatsApp,
-                      icon: const Icon(Icons.chat_rounded, size: 18),
-                      label: const Text('WhatsApp'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.success,
-                        side: const BorderSide(color: AppColors.success),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        minimumSize: const Size(0, 48),
+                    child: GestureDetector(
+                      onTap: onWhatsApp,
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(
+                              color: AppColors.success.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.chat_rounded,
+                                color: AppColors.success, size: 17),
+                            const SizedBox(width: 6),
+                            Text('واتساب',
+                                style: AppTextStyles.body.copyWith(
+                                    color: AppColors.success,
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                if (onWhatsApp != null) const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
-                  child: ElevatedButton(
+                  child: WaslButton(
+                    label: 'اختر هذا السائق',
+                    height: 48,
                     onPressed: onSelect,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      minimumSize: const Size(0, 48),
-                    ),
-                    child: Text('Choisir', style: AppTextStyles.button),
                   ),
                 ),
               ],
@@ -272,6 +309,22 @@ class _OfferCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TruckPlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: const Icon(Icons.local_shipping_rounded,
+          color: AppColors.primary, size: 36),
     );
   }
 }

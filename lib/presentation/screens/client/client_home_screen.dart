@@ -1,6 +1,10 @@
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +14,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../widgets/common/status_badge.dart';
+import '../../widgets/common/wasl_button.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -38,142 +43,178 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       final perm = await Geolocator.requestPermission();
       if (perm == LocationPermission.denied) return;
       final pos = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
       setState(() => _center = LatLng(pos.latitude, pos.longitude));
       _mapController?.animateCamera(CameraUpdate.newLatLng(_center));
     } catch (_) {}
+  }
+
+  void _goToMyLocation() {
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_center, 15));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _selectedTab,
+      extendBody: true,
+      body: Stack(
         children: [
-          _HomeTab(center: _center, onMapCreated: (c) => _mapController = c),
-          const _HistoryTab(),
-          const _ProfileTab(),
+          IndexedStack(
+            index: _selectedTab,
+            children: [
+              _HomeTab(
+                center: _center,
+                onMapCreated: (c) => _mapController = c,
+                onMyLocation: _goToMyLocation,
+              ),
+              const _HistoryTab(),
+              const _ProfileTab(),
+            ],
+          ),
+
+          // Floating bottom bar
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_selectedTab == 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    child: WaslButton(
+                      label: 'انشر طلب جديد',
+                      onPressed: () => context.push(AppRoutes.postJob),
+                      icon: Icons.add_rounded,
+                    ),
+                  )
+                      .animate()
+                      .slideY(
+                          begin: 0.4,
+                          end: 0,
+                          duration: 450.ms,
+                          delay: 300.ms,
+                          curve: Curves.easeOutCubic)
+                      .fadeIn(duration: 350.ms, delay: 300.ms),
+                ],
+                _FloatingBottomNav(
+                  current: _selectedTab,
+                  onTap: (i) => setState(() => _selectedTab = i),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      bottomNavigationBar: _BottomNav(
-        current: _selectedTab,
-        onTap: (i) => setState(() => _selectedTab = i),
-      ),
-      floatingActionButton: _selectedTab == 0
-          ? FloatingActionButton.extended(
-              onPressed: () => context.push(AppRoutes.postJob),
-              backgroundColor: AppColors.primary,
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: Text('Publier', style: AppTextStyles.button),
-            )
-              .animate()
-              .scale(delay: 400.ms, duration: 400.ms, curve: Curves.elasticOut)
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
 
-// ─── Home Tab ──────────────────────────────────────────────────────────────────
+// ─── Home Tab ─────────────────────────────────────────────────────────────────
 
 class _HomeTab extends StatelessWidget {
   final LatLng center;
   final void Function(GoogleMapController) onMapCreated;
+  final VoidCallback onMyLocation;
 
-  const _HomeTab({required this.center, required this.onMapCreated});
+  const _HomeTab({
+    required this.center,
+    required this.onMapCreated,
+    required this.onMyLocation,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Full-screen map
-        GoogleMap(
-          initialCameraPosition: CameraPosition(target: center, zoom: 13),
-          onMapCreated: onMapCreated,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          mapType: MapType.normal,
-          style: _darkMapStyle,
-        ),
+        // Full-screen map (placeholder on web, real map on mobile)
+        if (kIsWeb)
+          _WebMapPlaceholder()
+        else
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: center, zoom: 13),
+            onMapCreated: onMapCreated,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            compassEnabled: false,
+            mapType: MapType.normal,
+            style: _darkMapStyle,
+          ),
 
-        // Top greeting
+        // Frosted glass top bar
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20),
-                ],
-              ),
-              child: Consumer<AuthProvider>(
-                builder: (_, auth, _) => Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                      child: const Icon(Icons.person_rounded,
-                          color: AppColors.primary),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.surfaceBorder.withValues(alpha: 0.6),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Bonjour 👋', style: AppTextStyles.caption),
-                          Text(auth.user?.name ?? 'Client',
-                              style: AppTextStyles.bodyLarge),
-                        ],
-                      ),
+                  ),
+                  child: Consumer<AuthProvider>(
+                    builder: (ctx, auth, child) => Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGlow,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.4)),
+                          ),
+                          child: const Icon(Icons.person_rounded,
+                              color: AppColors.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('أهلاً بك 👋',
+                                  style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textHint)),
+                              Text(
+                                auth.user?.name ?? 'عميل',
+                                style: AppTextStyles.bodyLarge,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        _TopBarButton(
+                          icon: Icons.my_location_rounded,
+                          onTap: onMyLocation,
+                        ),
+                        const SizedBox(width: 8),
+                        _TopBarButton(
+                          icon: Icons.notifications_outlined,
+                          onTap: () => ctx.push(AppRoutes.notifications),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined,
-                          color: AppColors.textPrimary),
-                      onPressed: () =>
-                          context.push(AppRoutes.notifications),
-                    ),
-                  ],
-                ),
-              ),
-            )
-                .animate()
-                .slideY(begin: -0.3, end: 0, duration: 500.ms)
-                .fadeIn(duration: 400.ms),
-          ),
-        ),
-
-        // Bottom hint
-        Positioned(
-          bottom: 100,
-          left: 24,
-          right: 24,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.95),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.primary, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Appuyez sur + pour publier votre demande de déménagement',
-                    style: AppTextStyles.bodySecondary,
                   ),
                 ),
-              ],
+              ),
             ),
           )
-              .animate(delay: 600.ms)
-              .slideY(begin: 0.3, end: 0, duration: 400.ms)
+              .animate()
+              .slideY(begin: -0.3, end: 0, duration: 500.ms)
               .fadeIn(duration: 400.ms),
         ),
       ],
@@ -181,7 +222,63 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
-// ─── History Tab ───────────────────────────────────────────────────────────────
+class _WebMapPlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFF141414),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGlow,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.map_outlined,
+                  color: AppColors.primary, size: 34),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'الخريطة متاحة على التطبيق',
+              style: AppTextStyles.bodySecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopBarButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopBarButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceHigh,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: AppColors.textPrimary, size: 18),
+      ),
+    );
+  }
+}
+
+// ─── History Tab ──────────────────────────────────────────────────────────────
 
 class _HistoryTab extends StatelessWidget {
   const _HistoryTab();
@@ -191,60 +288,115 @@ class _HistoryTab extends StatelessWidget {
     final jobs = context.watch<JobProvider>().clientJobs;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Mes déménagements')),
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        title: Text(
+          'طلباتي',
+          style: GoogleFonts.cairo(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        elevation: 0,
+      ),
       body: jobs.isEmpty
           ? _EmptyState(
-              icon: Icons.history_rounded,
-              title: 'Aucun déménagement',
-              subtitle: 'Publiez votre première demande !',
+              icon: Icons.inventory_2_outlined,
+              title: 'لا يوجد طلبات بعد',
+              subtitle: 'انشر طلبك الأول للانتقال',
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
               itemCount: jobs.length,
-              itemBuilder: (_, i) {
+              itemBuilder: (ctx, i) {
                 final job = jobs[i];
                 return GestureDetector(
-                  onTap: () => context.push(AppRoutes.jobPosted,
-                      extra: job.id),
+                  onTap: () =>
+                      ctx.push(AppRoutes.jobPosted, extra: job.id),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border:
+                          Border.all(color: AppColors.surfaceBorder),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(job.city, style: AppTextStyles.bodyLarge),
+                            Text(job.city,
+                                style: AppTextStyles.bodyLarge.copyWith(
+                                    fontWeight: FontWeight.w700)),
                             StatusBadge(status: job.status),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         _LocationRow(
-                            icon: Icons.circle_rounded,
-                            color: AppColors.success,
-                            text: job.pickupLocation.address),
-                        const SizedBox(height: 4),
+                          icon: Icons.circle,
+                          color: AppColors.success,
+                          text: job.pickupLocation.address,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 5),
+                          child: Column(
+                            children: List.generate(
+                                2,
+                                (_) => Container(
+                                      width: 1.5,
+                                      height: 5,
+                                      margin: const EdgeInsets.symmetric(
+                                          vertical: 1),
+                                      color: AppColors.surfaceBorder,
+                                    )),
+                          ),
+                        ),
                         _LocationRow(
-                            icon: Icons.location_on_rounded,
-                            color: AppColors.primary,
-                            text: job.dropoffLocation.address),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${job.distanceKm.toStringAsFixed(1)} km',
-                          style: AppTextStyles.caption,
+                          icon: Icons.location_on_rounded,
+                          color: AppColors.primary,
+                          text: job.dropoffLocation.address,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(Icons.straighten_rounded,
+                                size: 14, color: AppColors.textHint),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${job.distanceKm.toStringAsFixed(1)} كم',
+                              style: AppTextStyles.caption,
+                            ),
+                            const SizedBox(width: 16),
+                            const Icon(Icons.access_time_rounded,
+                                size: 14, color: AppColors.textHint),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDate(job.createdAt),
+                              style: AppTextStyles.caption,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
+                  )
+                      .animate(delay: Duration(milliseconds: i * 60))
+                      .fadeIn(duration: 350.ms)
+                      .slideY(begin: 0.06, end: 0),
                 );
               },
             ),
     );
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 }
 
@@ -258,74 +410,215 @@ class _ProfileTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        title: Text(
+          'حسابي',
+          style: GoogleFonts.cairo(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
-          // Avatar + name
-          Center(
+          // Avatar + name hero
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.surfaceBorder),
+            ),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 44,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGlow,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: AppColors.primary, width: 2),
+                  ),
                   child: const Icon(Icons.person_rounded,
-                      color: AppColors.primary, size: 44),
+                      color: AppColors.primary, size: 40),
                 ),
                 const SizedBox(height: 12),
-                Text(auth.user?.name ?? '', style: AppTextStyles.h2),
-                Text(auth.user?.phone ?? '',
-                    style: AppTextStyles.bodySecondary),
+                Text(
+                  auth.user?.name ?? 'عميل',
+                  style: AppTextStyles.h2,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  auth.user?.phone ?? '',
+                  style: AppTextStyles.bodySecondary,
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 32),
-          _MenuItem(
-              icon: Icons.settings_rounded,
-              label: 'Paramètres',
-              onTap: () => context.push(AppRoutes.settings)),
-          _MenuItem(
-              icon: Icons.help_outline_rounded,
-              label: 'Aide & Support',
-              onTap: () => context.push(AppRoutes.support)),
-          _MenuItem(
-              icon: Icons.logout_rounded,
-              label: 'Déconnexion',
-              color: AppColors.error,
-              onTap: () async {
-                await auth.signOut();
-                if (context.mounted) context.go(AppRoutes.login);
-              }),
+          )
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .slideY(begin: 0.08, end: 0),
+
+          const SizedBox(height: 20),
+
+          _MenuSection(
+            title: 'الإعدادات',
+            items: [
+              _MenuItemData(
+                icon: Icons.settings_rounded,
+                label: 'الإعدادات',
+                onTap: () => context.push(AppRoutes.settings),
+              ),
+              _MenuItemData(
+                icon: Icons.help_outline_rounded,
+                label: 'المساعدة والدعم',
+                onTap: () => context.push(AppRoutes.support),
+              ),
+            ],
+          ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
+
+          const SizedBox(height: 12),
+
+          _MenuSection(
+            title: 'الحساب',
+            items: [
+              _MenuItemData(
+                icon: Icons.logout_rounded,
+                label: 'تسجيل الخروج',
+                color: AppColors.error,
+                onTap: () async {
+                  await auth.signOut();
+                  if (context.mounted) context.go(AppRoutes.login);
+                },
+              ),
+            ],
+          ).animate(delay: 150.ms).fadeIn(duration: 400.ms),
         ],
       ),
     );
   }
 }
 
-// ─── Shared widgets ────────────────────────────────────────────────────────────
+// ─── Floating bottom nav ──────────────────────────────────────────────────────
 
-class _BottomNav extends StatelessWidget {
+class _FloatingBottomNav extends StatelessWidget {
   final int current;
   final ValueChanged<int> onTap;
 
-  const _BottomNav({required this.current, required this.onTap});
+  const _FloatingBottomNav({required this.current, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: current,
-      onTap: onTap,
-      items: const [
-        BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded), label: 'Accueil'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded), label: 'Historique'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded), label: 'Profil'),
-      ],
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background.withValues(alpha: 0.88),
+            border: Border(
+              top: BorderSide(
+                  color: AppColors.surfaceBorder.withValues(alpha: 0.6)),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                _NavItem(
+                    icon: Icons.home_rounded,
+                    label: 'الرئيسية',
+                    selected: current == 0,
+                    onTap: () => onTap(0)),
+                _NavItem(
+                    icon: Icons.inventory_2_rounded,
+                    label: 'طلباتي',
+                    selected: current == 1,
+                    onTap: () => onTap(1)),
+                _NavItem(
+                    icon: Icons.person_rounded,
+                    label: 'حسابي',
+                    selected: current == 2,
+                    onTap: () => onTap(2)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.primaryGlow
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  icon,
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.textHint,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: AppTextStyles.caption.copyWith(
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.textHint,
+                  fontWeight: selected
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 class _LocationRow extends StatelessWidget {
   final IconData icon;
@@ -342,8 +635,12 @@ class _LocationRow extends StatelessWidget {
         Icon(icon, color: color, size: 12),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(text,
-              style: AppTextStyles.body, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Text(
+            text,
+            style: AppTextStyles.body,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -364,54 +661,120 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 72, color: AppColors.textHint),
-          const SizedBox(height: 16),
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceHigh,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 44, color: AppColors.textHint),
+          ),
+          const SizedBox(height: 20),
           Text(title, style: AppTextStyles.h3),
           const SizedBox(height: 8),
-          Text(subtitle,
-              style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
+          Text(
+            subtitle,
+            style: AppTextStyles.bodySecondary,
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 }
 
-class _MenuItem extends StatelessWidget {
+class _MenuItemData {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final Color? color;
-
-  const _MenuItem(
+  const _MenuItemData(
       {required this.icon,
       required this.label,
       required this.onTap,
       this.color});
+}
+
+class _MenuSection extends StatelessWidget {
+  final String title;
+  final List<_MenuItemData> items;
+
+  const _MenuSection({required this.title, required this.items});
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.textPrimary;
-    return ListTile(
-      onTap: onTap,
-      leading: Icon(icon, color: c),
-      title: Text(label, style: AppTextStyles.bodyLarge.copyWith(color: c)),
-      trailing:
-          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textHint),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 4, bottom: 8),
+          child: Text(title, style: AppTextStyles.label),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.surfaceBorder),
+          ),
+          child: Column(
+            children: items.asMap().entries.map((e) {
+              final item = e.value;
+              final isLast = e.key == items.length - 1;
+              final c = item.color ?? AppColors.textPrimary;
+              return Column(
+                children: [
+                  ListTile(
+                    onTap: item.onTap,
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: (item.color ?? AppColors.primary)
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(item.icon, color: c, size: 18),
+                    ),
+                    title: Text(
+                      item.label,
+                      style: AppTextStyles.body.copyWith(color: c),
+                    ),
+                    trailing: Icon(Icons.arrow_forward_ios_rounded,
+                        size: 13, color: AppColors.textHint),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 2),
+                  ),
+                  if (!isLast)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Divider(
+                          color: AppColors.surfaceBorder, height: 1),
+                    ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 }
 
-// ─── Dark map style ────────────────────────────────────────────────────────────
+// ─── Dark map style ───────────────────────────────────────────────────────────
 
 const _darkMapStyle = '''
 [
-  {"elementType":"geometry","stylers":[{"color":"#1a1a1a"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#212121"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2c"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#373737"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3c3c3c"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#000000"}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#212121"}]}
+  {"elementType":"geometry","stylers":[{"color":"#141414"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#6b6b6b"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#181818"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#252525"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#303030"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#383838"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#F97316","lightness":-70}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0a0a0a"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#1c1c1c"}]},
+  {"featureType":"poi","elementType":"labels","stylers":[{"visibility":"off"}]},
+  {"featureType":"transit","stylers":[{"visibility":"off"}]}
 ]
 ''';

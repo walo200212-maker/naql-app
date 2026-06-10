@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../widgets/common/wasl_button.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -17,7 +19,7 @@ class SupportScreen extends StatefulWidget {
 class _SupportScreenState extends State<SupportScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late final WebViewController _webController;
+  WebViewController? _webController;
   bool _webLoaded = false;
 
   @override
@@ -26,16 +28,18 @@ class _SupportScreenState extends State<SupportScreen>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
 
-    _webController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(AppColors.background)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) {
-          if (mounted) setState(() => _webLoaded = true);
-        },
-      ))
-      ..loadRequest(Uri.parse(
-          'https://tawk.to/chat/${AppConstants.tawkPropertyId}/${AppConstants.tawkWidgetId}'));
+    if (!kIsWeb) {
+      _webController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(AppColors.background)
+        ..setNavigationDelegate(NavigationDelegate(
+          onPageFinished: (_) {
+            if (mounted) setState(() => _webLoaded = true);
+          },
+        ))
+        ..loadRequest(Uri.parse(
+            'https://tawk.to/chat/${AppConstants.tawkPropertyId}/${AppConstants.tawkWidgetId}'));
+    }
   }
 
   void _onTabChanged() {
@@ -58,12 +62,23 @@ class _SupportScreenState extends State<SupportScreen>
     }
   }
 
+  Future<void> _openChatUrl() async {
+    final uri = Uri.parse(
+        'https://tawk.to/chat/${AppConstants.tawkPropertyId}/${AppConstants.tawkWidgetId}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Aide & Support'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: Text('المساعدة والدعم', style: AppTextStyles.h3),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
@@ -71,25 +86,27 @@ class _SupportScreenState extends State<SupportScreen>
           indicatorColor: AppColors.primary,
           indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
-            Tab(text: 'Chat'),
-            Tab(text: 'WhatsApp'),
-            Tab(text: 'FAQ'),
+            Tab(text: 'دردشة'),
+            Tab(text: 'واتساب'),
+            Tab(text: 'أسئلة'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _ChatTab(controller: _webController, isLoaded: _webLoaded),
+          kIsWeb || _webController == null
+              ? _ChatWebFallback(onOpen: _openChatUrl)
+              : _ChatTab(controller: _webController!, isLoaded: _webLoaded),
           _WhatsAppTab(onOpen: _openWhatsApp),
-          _FaqTab(),
+          const _FaqTab(),
         ],
       ),
     );
   }
 }
 
-// ── Chat Tab ─────────────────────────────────────────────────────────────────
+// ── Chat Tab (native WebView) ─────────────────────────────────────────────────
 
 class _ChatTab extends StatelessWidget {
   final WebViewController controller;
@@ -114,11 +131,64 @@ class _ChatTab extends StatelessWidget {
   }
 }
 
+// ── Chat Tab (web fallback) ───────────────────────────────────────────────────
+
+class _ChatWebFallback extends StatelessWidget {
+  final VoidCallback onOpen;
+  const _ChatWebFallback({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.support_agent_rounded,
+                  color: AppColors.primary, size: 44),
+            )
+                .animate()
+                .scale(duration: 500.ms, curve: Curves.elasticOut),
+            const SizedBox(height: 24),
+            Text('دعم مباشر',
+                style: AppTextStyles.h2, textAlign: TextAlign.center)
+                .animate(delay: 100.ms)
+                .fadeIn(duration: 400.ms),
+            const SizedBox(height: 8),
+            Text(
+              'افتح نافذة الدردشة للتحدث مع فريق الدعم.',
+              style: AppTextStyles.bodySecondary,
+              textAlign: TextAlign.center,
+            )
+                .animate(delay: 150.ms)
+                .fadeIn(duration: 400.ms),
+            const SizedBox(height: 32),
+            WaslButton(
+              label: 'فتح الدردشة',
+              onPressed: onOpen,
+              icon: Icons.open_in_new_rounded,
+            )
+                .animate(delay: 200.ms)
+                .fadeIn(duration: 400.ms),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── WhatsApp Tab ──────────────────────────────────────────────────────────────
 
 class _WhatsAppTab extends StatelessWidget {
   final VoidCallback onOpen;
-
   const _WhatsAppTab({required this.onOpen});
 
   @override
@@ -133,18 +203,25 @@ class _WhatsAppTab extends StatelessWidget {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.15),
+                color: AppColors.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: const Icon(Icons.chat_rounded,
-                  color: AppColors.success, size: 48),
+                  color: AppColors.success, size: 50),
             )
                 .animate()
                 .scale(duration: 500.ms, curve: Curves.elasticOut),
 
             const SizedBox(height: 24),
 
-            Text('Contacter l\'admin',
+            Text('تواصل مع الإدارة',
                 style: AppTextStyles.h2, textAlign: TextAlign.center)
                 .animate(delay: 100.ms)
                 .fadeIn(duration: 400.ms),
@@ -152,7 +229,7 @@ class _WhatsAppTab extends StatelessWidget {
             const SizedBox(height: 8),
 
             Text(
-              'Réponse rapide via WhatsApp pour toute question ou problème urgent.',
+              'نرد بسرعة عبر واتساب على أي سؤال أو مشكلة عاجلة.',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
             )
@@ -166,7 +243,7 @@ class _WhatsAppTab extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: onOpen,
                 icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Ouvrir WhatsApp'),
+                label: const Text('فتح واتساب'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF25D366),
                   foregroundColor: Colors.white,
@@ -179,10 +256,9 @@ class _WhatsAppTab extends StatelessWidget {
                 .animate(delay: 200.ms)
                 .fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            Text(AppConstants.adminWhatsApp,
-                style: AppTextStyles.caption)
+            Text(AppConstants.adminWhatsApp, style: AppTextStyles.caption)
                 .animate(delay: 250.ms)
                 .fadeIn(duration: 400.ms),
           ],
@@ -200,15 +276,13 @@ class _FaqTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
-        const SizedBox(height: 4),
         ...S.faqItems.asMap().entries.map((entry) {
           final i = entry.key;
           final faq = entry.value;
           return _FaqItem(question: faq['q']!, answer: faq['a']!, index: i);
         }),
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -239,13 +313,13 @@ class _FaqItemState extends State<_FaqItem> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: _expanded
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.card,
+            ? AppColors.primary.withValues(alpha: 0.07)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: _expanded
               ? AppColors.primary.withValues(alpha: 0.3)
-              : AppColors.border,
+              : AppColors.surfaceBorder,
         ),
       ),
       child: ClipRRect(
@@ -286,8 +360,8 @@ class _FaqItemState extends State<_FaqItem> {
                   ),
                   if (_expanded) ...[
                     const SizedBox(height: 10),
-                    const Divider(),
-                    const SizedBox(height: 8),
+                    Divider(color: AppColors.surfaceBorder, height: 1),
+                    const SizedBox(height: 10),
                     Text(widget.answer, style: AppTextStyles.bodySecondary),
                   ],
                 ],
@@ -297,7 +371,7 @@ class _FaqItemState extends State<_FaqItem> {
         ),
       ),
     )
-        .animate(delay: (widget.index * 50).ms)
+        .animate(delay: Duration(milliseconds: widget.index * 50))
         .fadeIn(duration: 300.ms)
         .slideY(begin: 0.04, end: 0);
   }

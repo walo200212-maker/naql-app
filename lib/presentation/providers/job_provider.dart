@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../data/models/job_model.dart';
 import '../../data/models/offer_model.dart';
 import '../../data/services/firestore_service.dart';
@@ -23,7 +23,7 @@ class JobProvider extends ChangeNotifier {
   LocationData? _pickup;
   LocationData? _dropoff;
   double _distanceKm = 0;
-  List<File> _selectedPhotos = [];
+  List<XFile> _selectedPhotos = [];
   String _description = '';
   String _city = AppConstants.supportedCities[0];
 
@@ -36,7 +36,7 @@ class JobProvider extends ChangeNotifier {
   LocationData? get pickup => _pickup;
   LocationData? get dropoff => _dropoff;
   double get distanceKm => _distanceKm;
-  List<File> get selectedPhotos => _selectedPhotos;
+  List<XFile> get selectedPhotos => _selectedPhotos;
   String get description => _description;
   String get city => _city;
 
@@ -62,7 +62,7 @@ class JobProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addPhoto(File file) {
+  void addPhoto(XFile file) {
     if (_selectedPhotos.length < 5) {
       _selectedPhotos.add(file);
       notifyListeners();
@@ -87,7 +87,6 @@ class JobProvider extends ChangeNotifier {
     if (_pickup == null || _dropoff == null) return null;
     _setLoading(true);
     try {
-      // Upload photos first
       List<String> photoUrls = [];
       if (_selectedPhotos.isNotEmpty) {
         final tempJobId = DateTime.now().millisecondsSinceEpoch.toString();

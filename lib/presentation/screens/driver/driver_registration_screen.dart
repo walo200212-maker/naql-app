@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +13,37 @@ import '../../../core/utils/validators.dart';
 import '../../../data/models/driver_model.dart';
 import '../../../data/services/storage_service.dart';
 import '../../providers/auth_provider.dart' as app_auth;
-import '../../widgets/common/naql_button.dart';
+import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_toast.dart';
+
+// ─── Local data ───────────────────────────────────────────────────────────────
+
+class _TruckData {
+  final String emoji;
+  final String label;
+  final String desc;
+  final String value;
+  const _TruckData(this.emoji, this.label, this.desc, this.value);
+}
+
+const _trucks = [
+  _TruckData('🚐', 'شاحنة صغيرة', 'للأغراض الخفيفة والصناديق', 'Petit camion'),
+  _TruckData('🚚', 'شاحنة متوسطة', 'غرفة أو غرفتين — مثالية للعائلات', 'Camion moyen'),
+  _TruckData('🚛', 'شاحنة كبيرة', 'نقل البيوت الكاملة والأثاث الثقيل', 'Grand camion'),
+];
+
+const _cityEmojis = {'Casablanca': '🏙️', 'Rabat': '🏛️'};
+const _cityNames  = {'Casablanca': 'الدار البيضاء', 'Rabat': 'الرباط'};
+
+const _stepTitles = [
+  'معلوماتك الشخصية',
+  'نوع الشاحنة والسعر',
+  'البطاقة الوطنية',
+  'الوثائق',
+  'المراجعة والإرسال',
+];
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 class DriverRegistrationScreen extends StatefulWidget {
   const DriverRegistrationScreen({super.key});
@@ -29,29 +59,29 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   static const int _totalSteps = 5;
   bool _isLoading = false;
 
-  // Step 1 — Basic info
+  // Step 1 — Personal info
   final _step1Key = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  String _selectedTruckType = AppConstants.truckTypes[0];
   String _selectedCity = AppConstants.supportedCities[0];
 
-  // Step 2 — CIN
-  final _step2Key = GlobalKey<FormState>();
+  // Step 2 — Truck type + price
+  String _selectedTruckType = AppConstants.truckTypes[0];
+  double _pricePerKm = 8.0;
+
+  // Step 3 — CIN
+  final _step3Key = GlobalKey<FormState>();
   final _cinController = TextEditingController();
-  File? _cinFront;
-  File? _cinBack;
+  XFile? _cinFront;
+  XFile? _cinBack;
 
-  // Step 3 — Selfie
-  File? _selfie;
+  // Step 4 — Documents
+  XFile? _selfie;
+  XFile? _driverLicense;
 
-  // Step 4 — Driving license
-  File? _driverLicense;
-
-  // Step 5 — Vehicle & registration docs
-  File? _truckPhoto;
-  File? _truckRegFront;
-  File? _truckRegBack;
+  // Step 5 — Vehicle
+  XFile? _truckPhoto;
+  XFile? _truckRegFront;
+  XFile? _truckRegBack;
 
   final _storageService = StorageService();
   final _picker = ImagePicker();
@@ -60,56 +90,47 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
-    _priceController.dispose();
     _cinController.dispose();
     super.dispose();
   }
 
-  Future<File?> _pickImage({bool camera = false}) async {
+  Future<XFile?> _pickImage({bool camera = false}) async {
     final xfile = await _picker.pickImage(
       source: camera ? ImageSource.camera : ImageSource.gallery,
       imageQuality: 80,
     );
-    if (xfile == null) return null;
-    return File(xfile.path);
+    return xfile;
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  void _showError(String msg) =>
+      WaslToast.show(context, msg, type: ToastType.error);
 
-  bool _validateCurrentStep() {
+  bool _validateStep() {
     switch (_currentStep) {
       case 0:
         return _step1Key.currentState?.validate() ?? false;
       case 1:
-        if (!(_step2Key.currentState?.validate() ?? false)) return false;
-        if (_cinFront == null || _cinBack == null) {
-          _showError('Ajoutez les deux photos de la CIN');
-          return false;
-        }
-        return true;
+        return true; // slider always valid
       case 2:
-        if (_selfie == null) {
-          _showError('Prenez votre selfie avec la CIN');
+        if (!(_step3Key.currentState?.validate() ?? false)) return false;
+        if (_cinFront == null || _cinBack == null) {
+          _showError('أضف صورتَي البطاقة الوطنية (الوجه والظهر)');
           return false;
         }
         return true;
       case 3:
+        if (_selfie == null) {
+          _showError('التقط صورة سيلفي مع البطاقة الوطنية');
+          return false;
+        }
         if (_driverLicense == null) {
-          _showError('Ajoutez votre permis de conduire');
+          _showError('أضف صورة رخصة القيادة');
           return false;
         }
         return true;
       case 4:
         if (_truckPhoto == null || _truckRegFront == null || _truckRegBack == null) {
-          _showError('Ajoutez toutes les photos du camion');
+          _showError('أضف صور الشاحنة وبطاقة التسجيل');
           return false;
         }
         return true;
@@ -119,12 +140,12 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   }
 
   Future<void> _nextOrSubmit() async {
-    if (!_validateCurrentStep()) return;
+    if (!_validateStep()) return;
     if (_currentStep < _totalSteps - 1) {
       setState(() => _currentStep++);
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
       );
     } else {
       await _submit();
@@ -135,19 +156,26 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
       );
+    } else {
+      context.pop();
     }
   }
 
   Future<void> _submit() async {
     setState(() => _isLoading = true);
     try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
-      final phone = FirebaseAuth.instance.currentUser!.phoneNumber ?? '';
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser == null) {
+        _showError('يجب تسجيل الدخول أولاً');
+        setState(() => _isLoading = false);
+        return;
+      }
+      final uid = authUser.uid;
+      final phone = authUser.phoneNumber ?? authUser.email ?? '';
 
-      // Upload all documents in parallel
       final results = await Future.wait([
         _storageService.uploadTruckPhoto(uid, _truckPhoto!),
         _storageService.uploadDriverDoc(uid, 'cin_front', _cinFront!),
@@ -164,7 +192,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         phone: phone,
         truckType: _selectedTruckType,
         truckPhotoUrl: results[0],
-        pricePerKm: double.parse(_priceController.text.trim()),
+        pricePerKm: _pricePerKm,
         city: _selectedCity,
         createdAt: DateTime.now(),
         walletBalance: 0,
@@ -179,9 +207,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       );
 
       if (!mounted) return;
-      await context
-          .read<app_auth.AuthProvider>()
-          .createDriverProfile(driver);
+      await context.read<app_auth.AuthProvider>().createDriverProfile(driver);
       if (!mounted) return;
       context.go(AppRoutes.driverHome);
     } catch (e) {
@@ -192,248 +218,209 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     }
   }
 
-  static const _stepTitles = [
-    'Informations de base',
-    'Carte Nationale (CIN)',
-    'Selfie avec CIN',
-    'Permis de conduire',
-    'Camion & Documents',
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(_stepTitles[_currentStep]),
-        leading: _currentStep > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: _back,
-              )
-            : null,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4),
-          child: _StepProgress(
-            current: _currentStep,
-            total: _totalSteps,
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _TopBar(
+              currentStep: _currentStep,
+              totalSteps: _totalSteps,
+              onBack: _back,
+            ),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _Step1PersonalInfo(
+                    formKey: _step1Key,
+                    nameController: _nameController,
+                    selectedCity: _selectedCity,
+                    onCityChanged: (v) => setState(() => _selectedCity = v),
+                  ),
+                  _Step2TruckPrice(
+                    selectedTruckType: _selectedTruckType,
+                    onTruckTypeChanged: (v) =>
+                        setState(() => _selectedTruckType = v),
+                    pricePerKm: _pricePerKm,
+                    onPriceChanged: (v) => setState(() => _pricePerKm = v),
+                  ),
+                  _Step3Cin(
+                    formKey: _step3Key,
+                    cinController: _cinController,
+                    cinFront: _cinFront,
+                    cinBack: _cinBack,
+                    onPickFront: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _cinFront = f);
+                    },
+                    onPickBack: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _cinBack = f);
+                    },
+                  ),
+                  _Step4Documents(
+                    selfie: _selfie,
+                    license: _driverLicense,
+                    onPickSelfie: () async {
+                      final f = await _pickImage(camera: true);
+                      if (f != null) setState(() => _selfie = f);
+                    },
+                    onPickLicense: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _driverLicense = f);
+                    },
+                  ),
+                  _Step5Review(
+                    driverName: _nameController.text,
+                    city: _selectedCity,
+                    truckType: _selectedTruckType,
+                    pricePerKm: _pricePerKm,
+                    truckPhoto: _truckPhoto,
+                    truckRegFront: _truckRegFront,
+                    truckRegBack: _truckRegBack,
+                    onPickTruck: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _truckPhoto = f);
+                    },
+                    onPickRegFront: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _truckRegFront = f);
+                    },
+                    onPickRegBack: () async {
+                      final f = await _pickImage();
+                      if (f != null) setState(() => _truckRegBack = f);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: WaslButton(
+                label: _currentStep < _totalSteps - 1
+                    ? 'التالي'
+                    : 'إنشاء حسابي كسائق',
+                onPressed: _nextOrSubmit,
+                isLoading: _isLoading,
+                icon: _currentStep < _totalSteps - 1
+                    ? Icons.arrow_forward_rounded
+                    : Icons.check_circle_rounded,
+              ),
+            ),
+          ],
         ),
       ),
-      body: Column(
+    );
+  }
+}
+
+// ─── Top bar with progress ────────────────────────────────────────────────────
+
+class _TopBar extends StatelessWidget {
+  final int currentStep;
+  final int totalSteps;
+  final VoidCallback onBack;
+
+  const _TopBar({
+    required this.currentStep,
+    required this.totalSteps,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step label row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_rounded,
+                    size: 20, color: AppColors.textPrimary),
+                onPressed: onBack,
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGlow,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'الخطوة ${currentStep + 1} / $totalSteps',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
                   ),
-                  child: Text(
-                    'Étape ${_currentStep + 1} sur $_totalSteps',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: List.generate(totalSteps, (i) {
+                final active = i <= currentStep;
+                return Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 350),
+                    height: 4,
+                    margin: EdgeInsets.only(right: i < totalSteps - 1 ? 5 : 0),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.primary : AppColors.surfaceBorder,
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: active
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primaryGlow,
+                                blurRadius: 6,
+                                spreadRadius: 0,
+                              )
+                            ]
+                          : null,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text(_stepTitles[_currentStep],
-                    style: AppTextStyles.bodySecondary),
-              ],
+                );
+              }),
             ),
           ),
-
-          // Page content
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _Step1BasicInfo(
-                  formKey: _step1Key,
-                  nameController: _nameController,
-                  priceController: _priceController,
-                  selectedTruckType: _selectedTruckType,
-                  onTruckTypeChanged: (v) =>
-                      setState(() => _selectedTruckType = v),
-                  selectedCity: _selectedCity,
-                  onCityChanged: (v) => setState(() => _selectedCity = v),
-                ),
-                _Step2Cin(
-                  formKey: _step2Key,
-                  cinController: _cinController,
-                  cinFront: _cinFront,
-                  cinBack: _cinBack,
-                  onPickFront: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _cinFront = f);
-                  },
-                  onPickBack: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _cinBack = f);
-                  },
-                ),
-                _Step3Selfie(
-                  selfie: _selfie,
-                  onPickSelfie: () async {
-                    final f = await _pickImage(camera: true);
-                    if (f != null) setState(() => _selfie = f);
-                  },
-                ),
-                _Step4License(
-                  license: _driverLicense,
-                  onPickLicense: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _driverLicense = f);
-                  },
-                ),
-                _Step5Vehicle(
-                  truckPhoto: _truckPhoto,
-                  truckRegFront: _truckRegFront,
-                  truckRegBack: _truckRegBack,
-                  onPickTruck: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _truckPhoto = f);
-                  },
-                  onPickRegFront: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _truckRegFront = f);
-                  },
-                  onPickRegBack: () async {
-                    final f = await _pickImage();
-                    if (f != null) setState(() => _truckRegBack = f);
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // Bottom action
+          const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: NaqlButton(
-              label: _currentStep < _totalSteps - 1
-                  ? 'Suivant'
-                  : 'Créer mon compte chauffeur',
-              onPressed: _nextOrSubmit,
-              isLoading: _isLoading,
-              icon: _currentStep < _totalSteps - 1
-                  ? Icons.arrow_forward_rounded
-                  : Icons.check_rounded,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              _stepTitles[currentStep],
+              style: AppTextStyles.bodySecondary,
             ),
           ),
+          const SizedBox(height: 4),
         ],
       ),
     );
   }
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// ─── Step 1: Personal info ────────────────────────────────────────────────────
 
-class _StepProgress extends StatelessWidget {
-  final int current;
-  final int total;
-
-  const _StepProgress({required this.current, required this.total});
-
-  @override
-  Widget build(BuildContext context) {
-    return LinearProgressIndicator(
-      value: (current + 1) / total,
-      backgroundColor: AppColors.surfaceVariant,
-      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-      minHeight: 3,
-    );
-  }
-}
-
-// ─── Reusable photo picker tile ───────────────────────────────────────────────
-
-class _PhotoPickerTile extends StatelessWidget {
-  final String label;
-  final File? image;
-  final VoidCallback onTap;
-  final IconData icon;
-  final double height;
-
-  const _PhotoPickerTile({
-    required this.label,
-    required this.image,
-    required this.onTap,
-    this.icon = Icons.add_a_photo_rounded,
-    this.height = 130,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: height,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: image != null ? AppColors.primary : AppColors.border,
-            width: image != null ? 2 : 1,
-          ),
-          image: image != null
-              ? DecorationImage(image: FileImage(image!), fit: BoxFit.cover)
-              : null,
-        ),
-        child: image == null
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: AppColors.textHint, size: 32),
-                  const SizedBox(height: 8),
-                  Text(label, style: AppTextStyles.bodySecondary),
-                ],
-              )
-            : Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check_rounded,
-                        color: Colors.white, size: 14),
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-// ─── Step 1: Basic info ───────────────────────────────────────────────────────
-
-class _Step1BasicInfo extends StatelessWidget {
+class _Step1PersonalInfo extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
-  final TextEditingController priceController;
-  final String selectedTruckType;
-  final ValueChanged<String> onTruckTypeChanged;
   final String selectedCity;
   final ValueChanged<String> onCityChanged;
 
-  const _Step1BasicInfo({
+  const _Step1PersonalInfo({
     required this.formKey,
     required this.nameController,
-    required this.priceController,
-    required this.selectedTruckType,
-    required this.onTruckTypeChanged,
     required this.selectedCity,
     required this.onCityChanged,
   });
@@ -449,26 +436,46 @@ class _Step1BasicInfo extends StatelessWidget {
           children: [
             // Welcome banner
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.12),
+                    AppColors.primaryDark.withValues(alpha: 0.06),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3)),
+                    color: AppColors.primary.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.local_shipping_rounded,
-                      color: AppColors.primary, size: 28),
-                  const SizedBox(width: 12),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.local_shipping_rounded,
+                        color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Rejoignez NaqlApp !',
-                            style: AppTextStyles.bodyLarge),
                         Text(
-                          'Gagnez de l\'argent avec votre camion',
+                          'انضم إلى وصل! 🚛',
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'اكسب المال مع شاحنتك',
                           style: AppTextStyles.bodySecondary,
                         ),
                       ],
@@ -476,59 +483,74 @@ class _Step1BasicInfo extends StatelessWidget {
                   ),
                 ],
               ),
-            ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: -0.1, end: 0),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            Text('Nom complet', style: AppTextStyles.label),
+            Text('الاسم الكامل', style: AppTextStyles.label),
             const SizedBox(height: 8),
             TextFormField(
               controller: nameController,
               style: AppTextStyles.body,
               decoration: const InputDecoration(
-                hintText: 'Mohamed Alami',
-                prefixIcon: Icon(Icons.person_rounded, color: AppColors.primary),
+                hintText: 'محمد العلمي',
+                prefixIcon:
+                    Icon(Icons.person_rounded, color: AppColors.primary),
               ),
-              validator: (v) => Validators.required(v, 'Nom'),
+              validator: (v) => Validators.required(v, 'الاسم'),
             ).animate(delay: 80.ms).fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            Text('Type de camion', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children:
-                    AppConstants.truckTypes.asMap().entries.map((entry) {
-                  final type = entry.value;
-                  final selected = selectedTruckType == type;
-                  return GestureDetector(
-                    onTap: () => onTruckTypeChanged(type),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+            Text('مدينة العمل', style: AppTextStyles.label),
+            const SizedBox(height: 12),
+
+            Row(
+              children: AppConstants.supportedCities.map((city) {
+                final selected = selectedCity == city;
+                final emoji = _cityEmojis[city] ?? '';
+                final name  = _cityNames[city] ?? city;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => onCityChanged(city),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      margin: EdgeInsets.only(
+                          right: city == AppConstants.supportedCities.first
+                              ? 8
+                              : 0),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       decoration: BoxDecoration(
                         color: selected
-                            ? AppColors.primary.withValues(alpha: 0.15)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
+                            ? AppColors.primary.withValues(alpha: 0.12)
+                            : AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.surfaceBorder,
+                          width: selected ? 2 : 1,
+                        ),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.primaryGlow,
+                                  blurRadius: 16,
+                                )
+                              ]
+                            : null,
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Icon(
-                            Icons.local_shipping_rounded,
-                            color: selected
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 12),
+                          Text(emoji,
+                              style: const TextStyle(fontSize: 22)),
+                          const SizedBox(height: 4),
                           Text(
-                            type,
+                            name,
                             style: AppTextStyles.body.copyWith(
                               color: selected
                                   ? AppColors.primary
@@ -538,53 +560,7 @@ class _Step1BasicInfo extends StatelessWidget {
                                   : FontWeight.w400,
                             ),
                           ),
-                          const Spacer(),
-                          if (selected)
-                            const Icon(Icons.check_rounded,
-                                color: AppColors.primary, size: 20),
                         ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ).animate(delay: 120.ms).fadeIn(duration: 400.ms),
-
-            const SizedBox(height: 20),
-
-            Text('Ville de travail', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            Row(
-              children: AppConstants.supportedCities.map((city) {
-                final selected = selectedCity == city;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => onCityChanged(city),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.primary
-                            : AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color:
-                              selected ? AppColors.primary : AppColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        city,
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.body.copyWith(
-                          color: selected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
                       ),
                     ),
                   ),
@@ -592,25 +568,7 @@ class _Step1BasicInfo extends StatelessWidget {
               }).toList(),
             ).animate(delay: 160.ms).fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 20),
-
-            Text('Votre prix par km (MAD)', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: priceController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              style: AppTextStyles.body,
-              decoration: const InputDecoration(
-                hintText: 'Ex: 8',
-                prefixIcon:
-                    Icon(Icons.speed_rounded, color: AppColors.primary),
-                suffixText: 'MAD/km',
-              ),
-              validator: Validators.pricePerKm,
-            ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
-
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -618,17 +576,234 @@ class _Step1BasicInfo extends StatelessWidget {
   }
 }
 
-// ─── Step 2: CIN ─────────────────────────────────────────────────────────────
+// ─── Step 2: Truck type + price ───────────────────────────────────────────────
 
-class _Step2Cin extends StatelessWidget {
+class _Step2TruckPrice extends StatelessWidget {
+  final String selectedTruckType;
+  final ValueChanged<String> onTruckTypeChanged;
+  final double pricePerKm;
+  final ValueChanged<double> onPriceChanged;
+
+  const _Step2TruckPrice({
+    required this.selectedTruckType,
+    required this.onTruckTypeChanged,
+    required this.pricePerKm,
+    required this.onPriceChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('اختر نوع شاحنتك', style: AppTextStyles.label),
+          const SizedBox(height: 12),
+
+          // Truck type animated cards
+          ..._trucks.asMap().entries.map((entry) {
+            final i = entry.key;
+            final truck = entry.value;
+            final selected = selectedTruckType == truck.value;
+            return GestureDetector(
+              onTap: () => onTruckTypeChanged(truck.value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.surfaceBorder,
+                    width: selected ? 2 : 1,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primaryGlow,
+                            blurRadius: 20,
+                          )
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.primary.withValues(alpha: 0.18)
+                            : AppColors.surfaceHigh,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Text(truck.emoji,
+                            style: const TextStyle(fontSize: 30)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            truck.label,
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(truck.desc, style: AppTextStyles.bodySecondary),
+                        ],
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? AppColors.primary : Colors.transparent,
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.surfaceBorder,
+                          width: 2,
+                        ),
+                      ),
+                      child: selected
+                          ? const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 14)
+                          : null,
+                    ),
+                  ],
+                ),
+              )
+                  .animate(delay: Duration(milliseconds: 80 + i * 60))
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.08, end: 0),
+            );
+          }),
+
+          const SizedBox(height: 28),
+
+          // Price slider
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('سعرك لكل كيلومتر', style: AppTextStyles.label),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: pricePerKm.toStringAsFixed(0),
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' درهم/كم',
+                      style: AppTextStyles.bodySecondary.copyWith(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+              .animate(delay: 300.ms)
+              .fadeIn(duration: 400.ms),
+
+          const SizedBox(height: 8),
+
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: AppColors.primary,
+              inactiveTrackColor: AppColors.surfaceBorder,
+              thumbColor: AppColors.primary,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 12),
+              overlayColor: AppColors.primaryGlow,
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 24),
+            ),
+            child: Slider(
+              value: pricePerKm,
+              min: 5,
+              max: 30,
+              divisions: 25,
+              onChanged: onPriceChanged,
+            ),
+          )
+              .animate(delay: 350.ms)
+              .fadeIn(duration: 400.ms),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('5 درهم',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textHint)),
+              Text('30 درهم',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textHint)),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.tips_and_updates_rounded,
+                    color: AppColors.success, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'متوسط السعر في المغرب 7–12 درهم/كم',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.success),
+                  ),
+                ),
+              ],
+            ),
+          ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Step 3: CIN ──────────────────────────────────────────────────────────────
+
+class _Step3Cin extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController cinController;
-  final File? cinFront;
-  final File? cinBack;
+  final XFile? cinFront;
+  final XFile? cinBack;
   final VoidCallback onPickFront;
   final VoidCallback onPickBack;
 
-  const _Step2Cin({
+  const _Step3Cin({
     required this.formKey,
     required this.cinController,
     required this.cinFront,
@@ -648,45 +823,67 @@ class _Step2Cin extends StatelessWidget {
           children: [
             _InfoBanner(
               icon: Icons.credit_card_rounded,
-              text:
-                  'Photographiez votre CIN (recto et verso) clairement, sans reflets.',
+              color: AppColors.info,
+              text: 'صوّر بطاقتك الوطنية (الوجه والظهر) بوضوح وبدون انعكاسات.',
             ),
             const SizedBox(height: 24),
-            Text('Numéro CIN', style: AppTextStyles.label),
+
+            Text('رقم البطاقة الوطنية', style: AppTextStyles.label),
             const SizedBox(height: 8),
             TextFormField(
               controller: cinController,
               style: AppTextStyles.body,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                hintText: 'Ex: AB123456',
+                hintText: 'مثال: AB123456',
                 prefixIcon:
                     Icon(Icons.badge_rounded, color: AppColors.primary),
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Numéro CIN requis';
-                if (v.trim().length < 5) return 'Numéro CIN invalide';
+                if (v == null || v.trim().isEmpty) return 'رقم البطاقة مطلوب';
+                if (v.trim().length < 5) return 'رقم البطاقة غير صالح';
                 return null;
               },
             ).animate(delay: 80.ms).fadeIn(),
+
             const SizedBox(height: 20),
-            Text('Recto (face)', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            _PhotoPickerTile(
-              label: 'Photo recto de la CIN',
-              image: cinFront,
-              onTap: onPickFront,
-              icon: Icons.credit_card_rounded,
-            ).animate(delay: 120.ms).fadeIn(),
-            const SizedBox(height: 16),
-            Text('Verso (dos)', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            _PhotoPickerTile(
-              label: 'Photo verso de la CIN',
-              image: cinBack,
-              onTap: onPickBack,
-              icon: Icons.credit_card_rounded,
-            ).animate(delay: 160.ms).fadeIn(),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('الوجه', style: AppTextStyles.label),
+                      const SizedBox(height: 8),
+                      _PhotoPickerTile(
+                        label: 'وجه البطاقة',
+                        image: cinFront,
+                        onTap: onPickFront,
+                        icon: Icons.credit_card_rounded,
+                      ).animate(delay: 120.ms).fadeIn(),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('الظهر', style: AppTextStyles.label),
+                      const SizedBox(height: 8),
+                      _PhotoPickerTile(
+                        label: 'ظهر البطاقة',
+                        image: cinBack,
+                        onTap: onPickBack,
+                        icon: Icons.credit_card_rounded,
+                      ).animate(delay: 160.ms).fadeIn(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
             const SizedBox(height: 16),
           ],
         ),
@@ -695,102 +892,19 @@ class _Step2Cin extends StatelessWidget {
   }
 }
 
-// ─── Step 3: Selfie ───────────────────────────────────────────────────────────
+// ─── Step 4: Documents ────────────────────────────────────────────────────────
 
-class _Step3Selfie extends StatelessWidget {
-  final File? selfie;
+class _Step4Documents extends StatelessWidget {
+  final XFile? selfie;
+  final XFile? license;
   final VoidCallback onPickSelfie;
-
-  const _Step3Selfie({required this.selfie, required this.onPickSelfie});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _InfoBanner(
-            icon: Icons.face_rounded,
-            text:
-                'Prenez un selfie en tenant votre CIN bien visible à côté de votre visage.',
-          ),
-          const SizedBox(height: 24),
-          Text('Selfie avec CIN', style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          _PhotoPickerTile(
-            label: 'Appuyez pour ouvrir la caméra',
-            image: selfie,
-            onTap: onPickSelfie,
-            icon: Icons.camera_alt_rounded,
-            height: 220,
-          ).animate(delay: 80.ms).fadeIn(),
-          const SizedBox(height: 12),
-          Text(
-            '• Visage entier visible\n• CIN lisible\n• Bonne luminosité',
-            style: AppTextStyles.caption,
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Step 4: Driving license ─────────────────────────────────────────────────
-
-class _Step4License extends StatelessWidget {
-  final File? license;
   final VoidCallback onPickLicense;
 
-  const _Step4License({required this.license, required this.onPickLicense});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _InfoBanner(
-            icon: Icons.drive_eta_rounded,
-            text:
-                'Photographiez votre permis de conduire (recto). Il doit être valide et lisible.',
-          ),
-          const SizedBox(height: 24),
-          Text('Permis de conduire', style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          _PhotoPickerTile(
-            label: 'Photo du permis de conduire',
-            image: license,
-            onTap: onPickLicense,
-            icon: Icons.drive_eta_rounded,
-            height: 180,
-          ).animate(delay: 80.ms).fadeIn(),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Step 5: Vehicle ──────────────────────────────────────────────────────────
-
-class _Step5Vehicle extends StatelessWidget {
-  final File? truckPhoto;
-  final File? truckRegFront;
-  final File? truckRegBack;
-  final VoidCallback onPickTruck;
-  final VoidCallback onPickRegFront;
-  final VoidCallback onPickRegBack;
-
-  const _Step5Vehicle({
-    required this.truckPhoto,
-    required this.truckRegFront,
-    required this.truckRegBack,
-    required this.onPickTruck,
-    required this.onPickRegFront,
-    required this.onPickRegBack,
+  const _Step4Documents({
+    required this.selfie,
+    required this.license,
+    required this.onPickSelfie,
+    required this.onPickLicense,
   });
 
   @override
@@ -801,62 +915,44 @@ class _Step5Vehicle extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _InfoBanner(
-            icon: Icons.local_shipping_rounded,
-            text:
-                'Ajoutez une photo de votre camion et la carte grise (recto et verso).',
+            icon: Icons.shield_rounded,
+            color: AppColors.primary,
+            text: 'نحتاج هذه الوثائق للتحقق من هويتك وضمان أمان منصتنا.',
           ),
           const SizedBox(height: 24),
-          Text('Photo du camion', style: AppTextStyles.label),
-          const SizedBox(height: 8),
+
+          Text('سيلفي مع البطاقة الوطنية', style: AppTextStyles.label),
+          const SizedBox(height: 4),
+          Text(
+            'وجهك كاملاً مرئي • البطاقة مقروءة • إضاءة جيدة',
+            style: AppTextStyles.caption.copyWith(color: AppColors.textHint),
+          ),
+          const SizedBox(height: 10),
           _PhotoPickerTile(
-            label: 'Photo extérieure du camion',
-            image: truckPhoto,
-            onTap: onPickTruck,
-            icon: Icons.local_shipping_rounded,
-            height: 160,
+            label: 'اضغط لفتح الكاميرا',
+            image: selfie,
+            onTap: onPickSelfie,
+            icon: Icons.camera_alt_rounded,
+            height: 200,
           ).animate(delay: 80.ms).fadeIn(),
-          const SizedBox(height: 20),
-          Text('Carte grise — Recto', style: AppTextStyles.label),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 24),
+
+          Text('رخصة القيادة', style: AppTextStyles.label),
+          const SizedBox(height: 4),
+          Text(
+            'يجب أن تكون صالحة ومقروءة',
+            style: AppTextStyles.caption.copyWith(color: AppColors.textHint),
+          ),
+          const SizedBox(height: 10),
           _PhotoPickerTile(
-            label: 'Recto de la carte grise',
-            image: truckRegFront,
-            onTap: onPickRegFront,
-            icon: Icons.article_rounded,
-          ).animate(delay: 120.ms).fadeIn(),
-          const SizedBox(height: 16),
-          Text('Carte grise — Verso', style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          _PhotoPickerTile(
-            label: 'Verso de la carte grise',
-            image: truckRegBack,
-            onTap: onPickRegBack,
-            icon: Icons.article_rounded,
+            label: 'صورة رخصة القيادة',
+            image: license,
+            onTap: onPickLicense,
+            icon: Icons.drive_eta_rounded,
+            height: 150,
           ).animate(delay: 160.ms).fadeIn(),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.warning, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Votre compte sera validé par l\'admin sous 24h après soumission.',
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.warning),
-                  ),
-                ),
-              ],
-            ),
-          ).animate(delay: 200.ms).fadeIn(),
+
           const SizedBox(height: 16),
         ],
       ),
@@ -864,35 +960,431 @@ class _Step5Vehicle extends StatelessWidget {
   }
 }
 
+// ─── Step 5: Review & submit ──────────────────────────────────────────────────
+
+class _Step5Review extends StatelessWidget {
+  final String driverName;
+  final String city;
+  final String truckType;
+  final double pricePerKm;
+  final XFile? truckPhoto;
+  final XFile? truckRegFront;
+  final XFile? truckRegBack;
+  final VoidCallback onPickTruck;
+  final VoidCallback onPickRegFront;
+  final VoidCallback onPickRegBack;
+
+  const _Step5Review({
+    required this.driverName,
+    required this.city,
+    required this.truckType,
+    required this.pricePerKm,
+    required this.truckPhoto,
+    required this.truckRegFront,
+    required this.truckRegBack,
+    required this.onPickTruck,
+    required this.onPickRegFront,
+    required this.onPickRegBack,
+  });
+
+  String get _truckLabel {
+    final match = _trucks.where((t) => t.value == truckType);
+    return match.isNotEmpty ? '${match.first.emoji} ${match.first.label}' : truckType;
+  }
+
+  String get _cityLabel => '${_cityEmojis[city] ?? ''} ${_cityNames[city] ?? city}'.trim();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Review summary card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.surfaceBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.fact_check_rounded,
+                        color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text('ملخص معلوماتك',
+                        style: AppTextStyles.bodyLarge
+                            .copyWith(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: AppColors.surfaceBorder, height: 1),
+                const SizedBox(height: 16),
+                _ReviewRow(icon: Icons.person_rounded, label: 'الاسم', value: driverName.isNotEmpty ? driverName : '—'),
+                _ReviewRow(icon: Icons.location_city_rounded, label: 'المدينة', value: _cityLabel),
+                _ReviewRow(icon: Icons.local_shipping_rounded, label: 'نوع الشاحنة', value: _truckLabel),
+                _ReviewRow(
+                  icon: Icons.speed_rounded,
+                  label: 'السعر',
+                  value: '${pricePerKm.toStringAsFixed(0)} درهم/كم',
+                  valueColor: AppColors.primary,
+                ),
+              ],
+            ),
+          )
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .slideY(begin: 0.08, end: 0),
+
+          const SizedBox(height: 24),
+
+          Text('صورة الشاحنة', style: AppTextStyles.label),
+          const SizedBox(height: 10),
+          _PhotoPickerTile(
+            label: 'صورة خارجية للشاحنة',
+            image: truckPhoto,
+            onTap: onPickTruck,
+            icon: Icons.local_shipping_rounded,
+            height: 160,
+          ).animate(delay: 80.ms).fadeIn(),
+
+          const SizedBox(height: 20),
+
+          Text('بطاقة تسجيل الشاحنة', style: AppTextStyles.label),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('الوجه', style: AppTextStyles.caption.copyWith(color: AppColors.textHint)),
+                    const SizedBox(height: 6),
+                    _PhotoPickerTile(
+                      label: 'وجه البطاقة',
+                      image: truckRegFront,
+                      onTap: onPickRegFront,
+                      icon: Icons.article_rounded,
+                    ).animate(delay: 120.ms).fadeIn(),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('الظهر', style: AppTextStyles.caption.copyWith(color: AppColors.textHint)),
+                    const SizedBox(height: 6),
+                    _PhotoPickerTile(
+                      label: 'ظهر البطاقة',
+                      image: truckRegBack,
+                      onTap: onPickRegBack,
+                      icon: Icons.article_rounded,
+                    ).animate(delay: 160.ms).fadeIn(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    color: AppColors.warning, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'سيتم مراجعة حسابك من طرف الإدارة خلال 24 ساعة.',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.warning),
+                  ),
+                ),
+              ],
+            ),
+          ).animate(delay: 200.ms).fadeIn(),
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _ReviewRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 8),
+          Text(label, style: AppTextStyles.bodySecondary),
+          const Spacer(),
+          Text(
+            value,
+            style: AppTextStyles.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Reusable photo picker tile (dashed → solid) ──────────────────────────────
+
+class _PhotoPickerTile extends StatefulWidget {
+  final String label;
+  final XFile? image;
+  final VoidCallback onTap;
+  final IconData icon;
+  final double height;
+
+  const _PhotoPickerTile({
+    required this.label,
+    required this.image,
+    required this.onTap,
+    this.icon = Icons.add_a_photo_rounded,
+    this.height = 130,
+  });
+
+  @override
+  State<_PhotoPickerTile> createState() => _PhotoPickerTileState();
+}
+
+class _PhotoPickerTileState extends State<_PhotoPickerTile> {
+  Future<dynamic>? _bytesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.image != null) {
+      _bytesFuture = widget.image!.readAsBytes();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_PhotoPickerTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.image != oldWidget.image) {
+      _bytesFuture = widget.image?.readAsBytes();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = widget.image != null;
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: filled
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : AppColors.surfaceHigh,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: filled
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    FutureBuilder<dynamic>(
+                      future: _bytesFuture,
+                      builder: (_, snap) => snap.hasData
+                          ? Image.memory(snap.data!, fit: BoxFit.cover)
+                          : const SizedBox(),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.3),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: AppColors.success,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded,
+                            color: Colors.white, size: 16),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'اضغط للتغيير',
+                            style: AppTextStyles.caption
+                                .copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : CustomPaint(
+                painter: _DashedBorderPainter(
+                  color: AppColors.surfaceBorder,
+                  radius: 16,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(widget.icon,
+                            color: AppColors.textHint, size: 24),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(widget.label, style: AppTextStyles.bodySecondary),
+                      const SizedBox(height: 2),
+                      Text(
+                        'اضغط للإضافة',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textHint),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+
+  const _DashedBorderPainter({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0.75, 0.75, size.width - 1.5, size.height - 1.5),
+        Radius.circular(radius),
+      ));
+
+    const dashWidth = 7.0;
+    const dashSpace = 5.0;
+    final metric = path.computeMetrics().first;
+    var d = 0.0;
+    while (d < metric.length) {
+      canvas.drawPath(metric.extractPath(d, d + dashWidth), paint);
+      d += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) => old.color != color;
+}
+
 // ─── Info banner (shared) ─────────────────────────────────────────────────────
 
 class _InfoBanner extends StatelessWidget {
   final IconData icon;
+  final Color color;
   final String text;
 
-  const _InfoBanner({required this.icon, required this.text});
+  const _InfoBanner({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.info, size: 20),
+          Icon(icon, color: color, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(text,
-                style: AppTextStyles.bodySecondary
-                    .copyWith(color: AppColors.info)),
+            child: Text(
+              text,
+              style: AppTextStyles.bodySecondary.copyWith(color: color),
+            ),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0);
+    )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: -0.1, end: 0);
   }
 }

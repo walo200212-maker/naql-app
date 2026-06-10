@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,19 +12,22 @@ class NotificationService {
   Future<void> init() async {
     await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings();
-    await _local.initialize(
-      const InitializationSettings(
-          android: androidSettings, iOS: iosSettings),
-    );
+    if (!kIsWeb) {
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings();
+      await _local.initialize(
+        const InitializationSettings(
+            android: androidSettings, iOS: iosSettings),
+      );
+    }
 
     FirebaseMessaging.onMessage.listen(_handleForeground);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
   }
 
   void _handleForeground(RemoteMessage message) {
+    if (kIsWeb) return;
     final notification = message.notification;
     if (notification == null) return;
     _local.show(
@@ -61,6 +65,7 @@ class NotificationService {
   }
 
   Future<void> subscribeToCity(String city) async {
-    await _messaging.subscribeToTopic('city_${city.toLowerCase().replaceAll(' ', '_')}');
+    await _messaging.subscribeToTopic(
+        'city_${city.toLowerCase().replaceAll(' ', '_')}');
   }
 }

@@ -11,7 +11,7 @@ import '../../../data/models/transaction_model.dart';
 import '../../../data/models/topup_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
-import '../../widgets/common/naql_button.dart';
+import '../../widgets/common/wasl_button.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -79,15 +79,20 @@ class _WalletScreenState extends State<WalletScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Mon portefeuille',
+                        Text('محفظتي',
                             style: AppTextStyles.bodySecondary),
                         const SizedBox(height: 8),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              balance.toStringAsFixed(2),
-                              style: AppTextStyles.wallet,
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: 0, end: balance),
+                              duration: const Duration(milliseconds: 1400),
+                              curve: Curves.easeOutExpo,
+                              builder: (_, value, _) => Text(
+                                value.toStringAsFixed(2),
+                                style: AppTextStyles.wallet,
+                              ),
                             )
                                 .animate()
                                 .fadeIn(duration: 600.ms)
@@ -119,7 +124,7 @@ class _WalletScreenState extends State<WalletScreen>
                                 const Icon(Icons.warning_amber_rounded,
                                     color: AppColors.error, size: 14),
                                 const SizedBox(width: 6),
-                                Text('Solde faible — rechargez !',
+                                Text('رصيد منخفض — اشحن الآن!',
                                     style: AppTextStyles.caption.copyWith(
                                         color: AppColors.error,
                                         fontWeight: FontWeight.w700)),
@@ -140,8 +145,8 @@ class _WalletScreenState extends State<WalletScreen>
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: NaqlButton(
-                label: 'Recharger le portefeuille',
+              child: WaslButton(
+                label: 'شحن المحفظة',
                 onPressed: () => context.push(AppRoutes.topUp),
                 icon: Icons.add_rounded,
               )
@@ -161,8 +166,8 @@ class _WalletScreenState extends State<WalletScreen>
                 indicatorColor: AppColors.primary,
                 indicatorSize: TabBarIndicatorSize.label,
                 tabs: const [
-                  Tab(text: 'Commissions'),
-                  Tab(text: 'Recharges'),
+                  Tab(text: 'العمولات'),
+                  Tab(text: 'الشحنات'),
                 ],
               ),
             ),
@@ -199,7 +204,7 @@ class _TransactionList extends StatelessWidget {
             const Icon(Icons.receipt_long_rounded,
                 size: 56, color: AppColors.textHint),
             const SizedBox(height: 12),
-            Text('Aucune transaction', style: AppTextStyles.bodySecondary),
+            Text('لا توجد معاملات', style: AppTextStyles.bodySecondary),
           ],
         ),
       );
@@ -239,11 +244,11 @@ class _TransactionList extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tx.isDebit ? 'Commission déduite' : 'Recharge',
+                      tx.isDebit ? 'عمولة مخصومة' : 'شحن',
                       style: AppTextStyles.bodyLarge,
                     ),
                     Text(
-                      timeago.format(tx.createdAt, locale: 'fr'),
+                      timeago.format(tx.createdAt),
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -290,7 +295,7 @@ class _TopUpList extends StatelessWidget {
             const Icon(Icons.account_balance_wallet_outlined,
                 size: 56, color: AppColors.textHint),
             const SizedBox(height: 12),
-            Text('Aucune recharge', style: AppTextStyles.bodySecondary),
+            Text('لا توجد شحنات', style: AppTextStyles.bodySecondary),
           ],
         ),
       );
@@ -325,13 +330,13 @@ class _TopUpList extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Recharge ${tu.amount.toStringAsFixed(0)} MAD',
+                      'شحن ${tu.amount.toStringAsFixed(0)} درهم',
                       style: AppTextStyles.bodyLarge,
                     ),
-                    Text('Réf: ${tu.reference}',
+                    Text('المرجع: ${tu.reference}',
                         style: AppTextStyles.caption),
                     Text(
-                      timeago.format(tu.createdAt, locale: 'fr'),
+                      timeago.format(tu.createdAt),
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -347,7 +352,7 @@ class _TopUpList extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  tu.status == 'confirmed' ? 'Confirmé' : 'En attente',
+                  tu.status == 'confirmed' ? 'مؤكد' : 'قيد الانتظار',
                   style: AppTextStyles.caption.copyWith(
                     color: tu.status == 'confirmed'
                         ? AppColors.success

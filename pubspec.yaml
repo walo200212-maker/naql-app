@@ -1,5 +1,5 @@
-name: naql_app
-description: NaqlApp (نقل) — Truck moving marketplace for Morocco
+name: wasl_app
+description: WaslApp (وصل) — Truck moving marketplace for Morocco
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -28,7 +28,8 @@ dependencies:
   # State Management
   provider: ^6.1.2
 
-  # UI
+  # UI & Fonts
+  google_fonts: ^6.2.1
   flutter_animate: ^4.5.0
   shimmer: ^3.0.0
   cached_network_image: ^3.3.1
@@ -41,9 +42,13 @@ dependencies:
   badges: ^3.1.2
   flutter_rating_bar: ^4.0.1
   dotted_border: ^2.1.0
+  animations: ^2.0.11
 
   # Navigation
   go_router: ^14.2.7
+
+  # Social Auth
+  google_sign_in: ^6.2.1
 
   # Utils
   intl: ^0.20.2
@@ -76,19 +81,3 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
-
-  # Cairo font: download from https://fonts.google.com/specimen/Cairo
-  # Place the .ttf files in assets/fonts/ then uncomment the block below.
-  # fonts:
-  #   - family: Cairo
-  #     fonts:
-  #       - asset: assets/fonts/Cairo-Regular.ttf
-  #         weight: 400
-  #       - asset: assets/fonts/Cairo-Medium.ttf
-  #         weight: 500
-  #       - asset: assets/fonts/Cairo-SemiBold.ttf
-  #         weight: 600
-  #       - asset: assets/fonts/Cairo-Bold.ttf
-  #         weight: 700
-  #       - asset: assets/fonts/Cairo-ExtraBold.ttf
-  #         weight: 800

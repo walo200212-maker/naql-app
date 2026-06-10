@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/notification_service.dart';
+import 'firebase_options.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/job_provider.dart';
 import 'presentation/providers/wallet_provider.dart';
@@ -16,23 +18,27 @@ Future<void> main() async {
 
   timeago.setLocaleMessages('fr', timeago.FrMessages());
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+  }
 
-  // Firebase reads from google-services.json (Android) / GoogleService-Info.plist (iOS).
-  // Run `flutterfire configure` to auto-generate firebase_options.dart if preferred.
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  try {
-    await NotificationService().init().timeout(const Duration(seconds: 5));
-  } catch (_) {}
+  if (!kIsWeb) {
+    try {
+      await NotificationService().init().timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
 
   runApp(const NaqlApp());
 }

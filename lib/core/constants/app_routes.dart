@@ -4,6 +4,9 @@ class AppRoutes {
   static const String login = '/login';
   static const String otp = '/otp';
   static const String userTypeSelect = '/user-type';
+  static const String password = '/password';
+  static const String permissions = '/permissions';
+  static const String welcome = '/welcome';
 
   // Client
   static const String clientHome = '/client/home';

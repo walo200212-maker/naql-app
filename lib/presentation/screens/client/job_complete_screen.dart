@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../providers/job_provider.dart';
-import '../../widgets/common/naql_button.dart';
+import '../../widgets/common/wasl_button.dart';
 
 class JobCompleteScreen extends StatefulWidget {
   final String jobId;
@@ -50,21 +51,31 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Confirmer la livraison'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
         automaticallyImplyLeading: false,
+        title: Text('تأكيد الاستلام', style: AppTextStyles.h3),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Success animation
+            // Success hero
             Container(
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.15),
+                color: AppColors.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withValues(alpha: 0.2),
+                    blurRadius: 32,
+                    spreadRadius: 4,
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.check_circle_rounded,
@@ -76,16 +87,16 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
                 .scale(duration: 600.ms, curve: Curves.elasticOut)
                 .fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            Text('Mission terminée !', style: AppTextStyles.display)
+            Text('تم التوصيل! 🎉', style: AppTextStyles.display)
                 .animate(delay: 200.ms)
                 .fadeIn(duration: 400.ms),
 
             const SizedBox(height: 8),
 
             Text(
-              'Comment évaluez-vous le chauffeur ?',
+              'كيف تقيّم السائق؟',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
             )
@@ -99,7 +110,7 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
               initialRating: 5,
               minRating: 1,
               itemCount: 5,
-              itemSize: 48,
+              itemSize: 50,
               glowColor: AppColors.warning,
               itemBuilder: (ctx, idx) =>
                   const Icon(Icons.star_rounded, color: AppColors.warning),
@@ -108,43 +119,61 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
                 .animate(delay: 400.ms)
                 .scale(duration: 400.ms, curve: Curves.elasticOut),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 10),
 
-            // Review
+            // Rating label
+            Text(
+              _ratingLabel(_rating),
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+                .animate(delay: 450.ms)
+                .fadeIn(duration: 300.ms),
+
+            const SizedBox(height: 28),
+
+            // Review field
             TextFormField(
               controller: _reviewController,
               maxLines: 3,
               style: AppTextStyles.body,
+              textAlign: TextAlign.right,
               decoration: const InputDecoration(
-                hintText: 'Laissez un commentaire (optionnel)...',
+                hintText: 'اترك تعليقاً (اختياري)...',
               ),
             )
                 .animate(delay: 500.ms)
                 .fadeIn(duration: 400.ms),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Price reminder
             if (job?.agreedPrice != null)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3)),
+                      color: AppColors.primary.withValues(alpha: 0.25)),
                 ),
                 child: Column(
                   children: [
-                    Text('À payer au chauffeur',
+                    Text('ادفع للسائق',
                         style: AppTextStyles.bodySecondary),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
-                      '${job!.agreedPrice!.toStringAsFixed(0)} MAD',
-                      style: AppTextStyles.price,
+                      job!.agreedPrice!.toStringAsFixed(0),
+                      style: GoogleFonts.poppins(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    Text('en cash', style: AppTextStyles.caption),
+                    Text('درهم نقداً', style: AppTextStyles.bodySecondary),
                   ],
                 ),
               )
@@ -153,8 +182,8 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
 
             const SizedBox(height: 32),
 
-            NaqlButton(
-              label: 'Confirmer et noter',
+            WaslButton(
+              label: 'تأكيد وتقييم',
               onPressed: _complete,
               isLoading: provider.isLoading,
               icon: Icons.check_rounded,
@@ -165,5 +194,13 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
         ),
       ),
     );
+  }
+
+  String _ratingLabel(double r) {
+    if (r >= 5) return 'ممتاز!';
+    if (r >= 4) return 'جيد جداً';
+    if (r >= 3) return 'جيد';
+    if (r >= 2) return 'مقبول';
+    return 'سيئ';
   }
 }

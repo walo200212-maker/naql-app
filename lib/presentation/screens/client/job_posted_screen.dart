@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../providers/job_provider.dart';
-import '../../widgets/common/naql_button.dart';
-import '../../widgets/common/skeleton_loader.dart';
+import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_shimmer.dart';
 
 class JobPostedScreen extends StatefulWidget {
   final String jobId;
@@ -34,29 +35,44 @@ class _JobPostedScreenState extends State<JobPostedScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Votre demande'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: Text(
+          'طلبك',
+          style: GoogleFonts.cairo(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
         actions: [
           TextButton(
             onPressed: () => context.go(AppRoutes.clientHome),
-            child: const Text('Retour'),
+            child: Text(
+              'الرئيسية',
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.primary),
+            ),
           ),
         ],
       ),
       body: job == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status card
+                  // Status hero card
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.primary.withValues(alpha: 0.2),
-                          AppColors.surfaceVariant,
+                          AppColors.primary.withValues(alpha: 0.18),
+                          AppColors.surface,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -68,32 +84,58 @@ class _JobPostedScreenState extends State<JobPostedScreen> {
                     child: Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(14),
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Icon(Icons.local_shipping_rounded,
-                              color: AppColors.primary, size: 28),
+                              color: Colors.white, size: 30),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Demande publiée !',
-                                  style: AppTextStyles.h3),
+                              Text(
+                                'تم نشر طلبك! 🎉',
+                                style: AppTextStyles.h3,
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 offers.isEmpty
-                                    ? 'En attente d\'offres de chauffeurs...'
-                                    : '${offers.length} offre(s) reçue(s)',
-                                style: AppTextStyles.bodySecondary,
+                                    ? 'في انتظار عروض السائقين...'
+                                    : 'وصل ${offers.length} عرض',
+                                style: AppTextStyles.bodySecondary.copyWith(
+                                  color: offers.isNotEmpty
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
+                                ),
                               ),
                             ],
                           ),
                         ),
+                        if (offers.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: AppColors.success
+                                      .withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              '${offers.length}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.success,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   )
@@ -101,35 +143,61 @@ class _JobPostedScreenState extends State<JobPostedScreen> {
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: -0.1, end: 0),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Route info
+                  // Route card
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.surfaceBorder),
                     ),
                     child: Column(
                       children: [
                         _RoutePoint(
-                          icon: Icons.circle_rounded,
+                          icon: Icons.circle,
                           color: AppColors.success,
-                          label: 'Départ',
+                          label: 'الانطلاق',
                           address: job.pickupLocation.address,
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(left: 10),
-                          child: Container(
-                              width: 1,
-                              height: 20,
-                              color: AppColors.border),
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Row(
+                            children: List.generate(
+                              3,
+                              (_) => Container(
+                                width: 1.5,
+                                height: 5,
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 1),
+                                color: AppColors.surfaceBorder,
+                              ),
+                            ),
+                          ),
                         ),
                         _RoutePoint(
                           icon: Icons.location_on_rounded,
                           color: AppColors.primary,
-                          label: 'Arrivée',
+                          label: 'الوصول',
                           address: job.dropoffLocation.address,
+                        ),
+                        const SizedBox(height: 12),
+                        Divider(color: AppColors.surfaceBorder, height: 1),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(Icons.straighten_rounded,
+                                color: AppColors.textHint, size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${job.distanceKm.toStringAsFixed(1)} كم',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -137,40 +205,25 @@ class _JobPostedScreenState extends State<JobPostedScreen> {
                       .animate(delay: 100.ms)
                       .fadeIn(duration: 400.ms),
 
-                  const SizedBox(height: 8),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.straighten_rounded,
-                            color: AppColors.primary, size: 16),
-                        const SizedBox(width: 8),
-                        Text('${job.distanceKm.toStringAsFixed(1)} km',
-                            style: AppTextStyles.body
-                                .copyWith(color: AppColors.primary)),
-                      ],
-                    ),
-                  ),
-
                   const SizedBox(height: 24),
 
-                  // Offers section
+                  // Offers section header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Offres de chauffeurs', style: AppTextStyles.h3),
+                      Text('عروض السائقين', style: AppTextStyles.h3),
                       if (offers.isNotEmpty)
-                        TextButton(
-                          onPressed: () => context.push(
+                        GestureDetector(
+                          onTap: () => context.push(
                               AppRoutes.driverOffers,
                               extra: widget.jobId),
-                          child: const Text('Voir tout'),
+                          child: Text(
+                            'عرض الكل',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -178,28 +231,34 @@ class _JobPostedScreenState extends State<JobPostedScreen> {
                   const SizedBox(height: 12),
 
                   if (offers.isEmpty) ...[
-                    const DriverCardSkeleton(),
-                    const DriverCardSkeleton(),
-                    const SizedBox(height: 8),
+                    const WaslShimmerList(count: 2),
+                    const SizedBox(height: 12),
                     Center(
                       child: Text(
-                        'Les chauffeurs à proximité voient votre annonce...',
+                        'السائقون القريبون يرون إعلانك الآن...',
                         style: AppTextStyles.bodySecondary,
                         textAlign: TextAlign.center,
                       ),
                     ),
                   ] else
-                    ...offers.take(3).map((offer) => _OfferPreviewCard(
-                          offer: offer,
+                    ...offers.take(3).toList().asMap().entries.map((e) =>
+                        _OfferPreviewCard(
+                          offer: e.value,
                           jobId: widget.jobId,
                           distanceKm: job.distanceKm,
-                        )),
+                        )
+                            .animate(
+                                delay: Duration(milliseconds: e.key * 80))
+                            .fadeIn(duration: 350.ms)
+                            .slideY(begin: 0.06, end: 0)),
                 ],
               ),
             ),
     );
   }
 }
+
+// ─── Route point ──────────────────────────────────────────────────────────────
 
 class _RoutePoint extends StatelessWidget {
   final IconData icon;
@@ -218,17 +277,19 @@ class _RoutePoint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: color, size: 14),
+        Icon(icon, color: color, size: 13),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: AppTextStyles.caption),
-              Text(address,
-                  style: AppTextStyles.body,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                address,
+                style: AppTextStyles.body,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -236,6 +297,8 @@ class _RoutePoint extends StatelessWidget {
     );
   }
 }
+
+// ─── Offer preview card ───────────────────────────────────────────────────────
 
 class _OfferPreviewCard extends StatelessWidget {
   final dynamic offer;
@@ -254,9 +317,9 @@ class _OfferPreviewCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Row(
         children: [
@@ -264,28 +327,34 @@ class _OfferPreviewCard extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.primaryGlow,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3)),
             ),
             child: const Icon(Icons.local_shipping_rounded,
-                color: AppColors.primary),
+                color: AppColors.primary, size: 26),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Chauffeur', style: AppTextStyles.bodyLarge),
+                Text('سائق 🚛', style: AppTextStyles.bodyLarge),
+                const SizedBox(height: 4),
                 Text(
-                  '${offer.totalPrice.toStringAsFixed(0)} MAD',
-                  style:
-                      AppTextStyles.h3.copyWith(color: AppColors.primary),
+                  '${offer.totalPrice.toStringAsFixed(0)} درهم',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
           ),
-          NaqlButton(
-            label: 'Choisir',
+          WaslButton(
+            label: 'اختر',
             height: 40,
             onPressed: () => context.push(AppRoutes.driverOffers,
                 extra: jobId),

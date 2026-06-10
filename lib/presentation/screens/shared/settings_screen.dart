@@ -17,7 +17,7 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Paramètres')),
+      appBar: AppBar(title: const Text('الإعدادات')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -58,7 +58,7 @@ class SettingsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          auth.isDriver ? 'Chauffeur' : 'Client',
+                          auth.isDriver ? 'سائق' : 'عميل',
                           style: AppTextStyles.caption.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w700),
@@ -76,47 +76,45 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Section: App
-          _SectionHeader(title: 'Application'),
+          _SectionHeader(title: 'التطبيق'),
           _SettingsTile(
             icon: Icons.help_outline_rounded,
-            label: 'Aide & Support',
+            label: 'المساعدة والدعم',
             onTap: () => context.push(AppRoutes.support),
           ),
           _SettingsTile(
             icon: Icons.notifications_outlined,
-            label: 'Notifications',
+            label: 'الإشعارات',
             onTap: () {},
           ),
           _SettingsTile(
             icon: Icons.language_rounded,
-            label: 'Langue',
-            trailing: const Text('Français',
+            label: 'اللغة',
+            trailing: const Text('العربية',
                 style: TextStyle(color: AppColors.textSecondary)),
             onTap: () {},
           ),
 
           const SizedBox(height: 16),
 
-          // Section: Legal
-          _SectionHeader(title: 'Légal'),
+          _SectionHeader(title: 'قانوني'),
           _SettingsTile(
             icon: Icons.privacy_tip_outlined,
-            label: 'Politique de confidentialité',
+            label: 'سياسة الخصوصية',
             onTap: () {},
           ),
           _SettingsTile(
             icon: Icons.description_outlined,
-            label: 'Conditions d\'utilisation',
+            label: 'شروط الاستخدام',
             onTap: () {},
           ),
 
           const SizedBox(height: 16),
 
-          // Section: About
-          _SectionHeader(title: 'À propos'),
+          _SectionHeader(title: 'حول التطبيق'),
           _SettingsTile(
             icon: Icons.info_outline_rounded,
-            label: 'Version de l\'app',
+            label: 'إصدار التطبيق',
             trailing: const Text('1.0.0',
                 style: TextStyle(color: AppColors.textSecondary)),
             onTap: () {},
@@ -134,27 +132,26 @@ class SettingsScreen extends StatelessWidget {
             child: ListTile(
               leading: const Icon(Icons.logout_rounded, color: AppColors.error),
               title: Text(
-                'Déconnexion',
+                'تسجيل الخروج',
                 style: AppTextStyles.bodyLarge.copyWith(color: AppColors.error),
               ),
               onTap: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    backgroundColor: AppColors.card,
+                    backgroundColor: AppColors.surface,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20)),
-                    title: const Text('Déconnexion'),
-                    content: const Text(
-                        'Voulez-vous vraiment vous déconnecter ?'),
+                    title: const Text('تسجيل الخروج'),
+                    content: const Text('هل تريد تسجيل الخروج فعلاً؟'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Annuler'),
+                        child: const Text('إلغاء'),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: Text('Déconnecter',
+                        child: Text('خروج',
                             style: TextStyle(color: AppColors.error)),
                       ),
                     ],

@@ -12,7 +12,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../data/services/firestore_service.dart';
 import '../../../data/models/driver_model.dart';
 import '../../providers/job_provider.dart';
-import '../../widgets/common/naql_button.dart';
+import '../../widgets/common/wasl_button.dart';
 import '../../widgets/common/status_badge.dart';
 
 class JobConfirmedScreen extends StatefulWidget {
@@ -49,9 +49,7 @@ class _JobConfirmedScreenState extends State<JobConfirmedScreen> {
   }
 
   Future<void> _confirmStart() async {
-    await context
-        .read<JobProvider>()
-        .confirmJobStarted(widget.jobId);
+    await context.read<JobProvider>().confirmJobStarted(widget.jobId);
   }
 
   @override
@@ -60,192 +58,217 @@ class _JobConfirmedScreenState extends State<JobConfirmedScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Mission confirmée'),
-        automaticallyImplyLeading: false,
-      ),
       body: job == null
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Status banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.success.withValues(alpha: 0.2),
-                          AppColors.surfaceVariant,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.check_circle_rounded,
-                            color: AppColors.success, size: 52)
-                            .animate()
-                            .scale(duration: 600.ms, curve: Curves.elasticOut),
-                        const SizedBox(height: 12),
-                        Text('Chauffeur en route !',
-                            style: AppTextStyles.h2),
-                        const SizedBox(height: 4),
-                        StatusBadge(status: job.status),
+          : CustomScrollView(
+              slivers: [
+                // App bar
+                SliverAppBar(
+                  pinned: true,
+                  backgroundColor: AppColors.background,
+                  automaticallyImplyLeading: false,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () => context.pop(),
+                  ),
+                  title: Text('تتبع الطلب', style: AppTextStyles.h3),
+                  centerTitle: true,
+                ),
+
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Status hero
+                      _StatusHero(job: job)
+                          .animate()
+                          .fadeIn(duration: 400.ms)
+                          .slideY(begin: -0.08, end: 0),
+
+                      const SizedBox(height: 20),
+
+                      // Driver card
+                      if (_driver != null)
+                        _DriverCard(
+                          driver: _driver!,
+                          onWhatsApp: _openWhatsApp,
+                        )
+                            .animate(delay: 100.ms)
+                            .fadeIn(duration: 400.ms),
+
+                      const SizedBox(height: 16),
+
+                      // Job summary
+                      _JobSummaryCard(job: job)
+                          .animate(delay: 200.ms)
+                          .fadeIn(duration: 400.ms),
+
+                      const SizedBox(height: 24),
+
+                      // Live map (in-progress)
+                      if (job.status == AppConstants.jobStatusInProgress &&
+                          job.matchedDriverId != null) ...[
+                        _LiveDriverMap(
+                          driverId: job.matchedDriverId!,
+                          dropoffLat: job.dropoffLocation.lat,
+                          dropoffLng: job.dropoffLocation.lng,
+                        )
+                            .animate(delay: 250.ms)
+                            .fadeIn(duration: 400.ms),
+                        const SizedBox(height: 16),
+                        _InProgressBanner()
+                            .animate(delay: 300.ms)
+                            .fadeIn(duration: 400.ms),
+                        const SizedBox(height: 16),
+                        WaslButton(
+                          label: 'تأكيد الاستلام',
+                          onPressed: () => context.push(
+                              AppRoutes.jobComplete,
+                              extra: widget.jobId),
+                          icon: Icons.check_rounded,
+                        )
+                            .animate(delay: 350.ms)
+                            .fadeIn(duration: 400.ms),
                       ],
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 400.ms),
 
-                  const SizedBox(height: 24),
-
-                  // Driver card
-                  if (_driver != null)
-                    _DriverInfoCard(driver: _driver!, onWhatsApp: _openWhatsApp)
-                        .animate(delay: 100.ms)
-                        .fadeIn(duration: 400.ms),
-
-                  const SizedBox(height: 16),
-
-                  // Job summary
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        _SummaryRow(
-                          label: 'Prix convenu',
-                          value:
-                              '${job.agreedPrice?.toStringAsFixed(0) ?? '-'} MAD',
-                          highlight: true,
-                        ),
-                        const Divider(),
-                        _SummaryRow(
-                          label: 'Distance',
-                          value: '${job.distanceKm.toStringAsFixed(1)} km',
-                        ),
-                        const Divider(),
-                        _SummaryRow(
-                          label: 'Paiement',
-                          value: 'Cash au chauffeur',
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate(delay: 200.ms)
-                      .fadeIn(duration: 400.ms),
-
-                  const SizedBox(height: 32),
-
-                  if (job.status == AppConstants.jobStatusMatched)
-                    NaqlButton(
-                      label: 'Confirmer le départ',
-                      onPressed: _confirmStart,
-                      icon: Icons.play_arrow_rounded,
-                    )
-                        .animate(delay: 300.ms)
-                        .fadeIn(duration: 400.ms),
-
-                  if (job.status == AppConstants.jobStatusInProgress) ...[
-                    // Live driver location map
-                    if (job.matchedDriverId != null)
-                      _LiveDriverMap(
-                        driverId: job.matchedDriverId!,
-                        dropoffLat: job.dropoffLocation.lat,
-                        dropoffLng: job.dropoffLocation.lng,
-                      ).animate(delay: 250.ms).fadeIn(duration: 400.ms),
-
-                    const SizedBox(height: 16),
-
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.local_shipping_rounded,
-                              color: AppColors.primary),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Déménagement en cours...',
-                              style: AppTextStyles.bodyLarge
-                                  .copyWith(color: AppColors.primary),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    NaqlButton(
-                      label: 'Confirmer la livraison',
-                      onPressed: () => context.push(
-                          AppRoutes.jobComplete,
-                          extra: widget.jobId),
-                      icon: Icons.check_rounded,
-                    ),
-                  ],
-                ],
-              ),
+                      // Confirm start (matched)
+                      if (job.status == AppConstants.jobStatusMatched)
+                        WaslButton(
+                          label: 'تأكيد انطلاق السائق',
+                          onPressed: _confirmStart,
+                          icon: Icons.play_arrow_rounded,
+                        )
+                            .animate(delay: 300.ms)
+                            .fadeIn(duration: 400.ms),
+                    ]),
+                  ),
+                ),
+              ],
             ),
     );
   }
 }
 
-class _DriverInfoCard extends StatelessWidget {
+// ─── Status hero ──────────────────────────────────────────────────────────────
+
+class _StatusHero extends StatelessWidget {
+  final dynamic job;
+  const _StatusHero({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    final isInProgress = job.status == AppConstants.jobStatusInProgress;
+    final color = isInProgress ? AppColors.primary : AppColors.success;
+    final icon = isInProgress
+        ? Icons.local_shipping_rounded
+        : Icons.check_circle_rounded;
+    final title = isInProgress ? 'النقل جارٍ الآن' : 'السائق في الطريق!';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.18),
+            AppColors.surface,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 38),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scaleXY(
+                  begin: 1, end: 1.06, duration: 1200.ms, curve: Curves.easeInOut),
+          const SizedBox(height: 14),
+          Text(title, style: AppTextStyles.h2),
+          const SizedBox(height: 6),
+          StatusBadge(status: job.status),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Driver card ──────────────────────────────────────────────────────────────
+
+class _DriverCard extends StatelessWidget {
   final DriverModel driver;
   final VoidCallback onWhatsApp;
-
-  const _DriverInfoCard({required this.driver, required this.onWhatsApp});
+  const _DriverCard({required this.driver, required this.onWhatsApp});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
+              color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(Icons.local_shipping_rounded,
-                color: AppColors.primary, size: 28),
+                color: AppColors.primary, size: 30),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(driver.name, style: AppTextStyles.bodyLarge),
+                const SizedBox(height: 2),
                 Text(driver.truckType, style: AppTextStyles.bodySecondary),
+                const SizedBox(height: 2),
                 Text('⭐ ${driver.rating.toStringAsFixed(1)}',
                     style: AppTextStyles.caption),
               ],
             ),
           ),
-          IconButton(
-            onPressed: onWhatsApp,
-            icon: const Icon(Icons.chat_rounded, color: AppColors.success),
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.success.withValues(alpha: 0.15),
+          // WhatsApp button
+          GestureDetector(
+            onTap: onWhatsApp,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.chat_rounded,
+                      color: AppColors.success, size: 16),
+                  const SizedBox(width: 6),
+                  Text('واتساب',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.success,
+                              fontWeight: FontWeight.w700)),
+                ],
+              ),
             ),
           ),
         ],
@@ -254,27 +277,90 @@ class _DriverInfoCard extends StatelessWidget {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
+// ─── Job summary ──────────────────────────────────────────────────────────────
+
+class _JobSummaryCard extends StatelessWidget {
+  final dynamic job;
+  const _JobSummaryCard({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Column(
+        children: [
+          _Row(
+            label: 'السعر المتفق عليه',
+            value: '${job.agreedPrice?.toStringAsFixed(0) ?? '-'} درهم',
+            highlight: true,
+          ),
+          Divider(color: AppColors.surfaceBorder, height: 20),
+          _Row(
+            label: 'المسافة',
+            value: '${job.distanceKm.toStringAsFixed(1)} كم',
+          ),
+          Divider(color: AppColors.surfaceBorder, height: 20),
+          _Row(
+            label: 'طريقة الدفع',
+            value: 'نقداً للسائق',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
   final String label;
   final String value;
   final bool highlight;
-
-  const _SummaryRow(
+  const _Row(
       {required this.label, required this.value, this.highlight = false});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.bodySecondary),
+        Text(
+          value,
+          style: highlight
+              ? AppTextStyles.h3.copyWith(color: AppColors.primary)
+              : AppTextStyles.bodyLarge,
+        ),
+      ],
+    );
+  }
+}
+
+// ─── In-progress banner ───────────────────────────────────────────────────────
+
+class _InProgressBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTextStyles.bodySecondary),
-          Text(
-            value,
-            style: highlight
-                ? AppTextStyles.h3.copyWith(color: AppColors.primary)
-                : AppTextStyles.bodyLarge,
+          const Icon(Icons.local_shipping_rounded,
+              color: AppColors.primary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'النقل جارٍ... سيتم إشعارك عند الوصول',
+              style: AppTextStyles.body.copyWith(color: AppColors.primary),
+            ),
           ),
         ],
       ),
@@ -307,9 +393,9 @@ class _LiveDriverMapState extends State<_LiveDriverMap> {
     final dropoff = LatLng(widget.dropoffLat, widget.dropoffLng);
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        height: 200,
+        height: 220,
         child: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
               .collection('drivers')
@@ -340,12 +426,12 @@ class _LiveDriverMapState extends State<_LiveDriverMap> {
                     position: driverPos,
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                         BitmapDescriptor.hueOrange),
-                    infoWindow: const InfoWindow(title: 'Chauffeur en route'),
+                    infoWindow: const InfoWindow(title: 'السائق في الطريق'),
                   ),
                 Marker(
                   markerId: const MarkerId('dropoff'),
                   position: dropoff,
-                  infoWindow: const InfoWindow(title: 'Destination'),
+                  infoWindow: const InfoWindow(title: 'الوجهة'),
                 ),
               },
             );

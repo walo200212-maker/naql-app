@@ -7,7 +7,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
-import '../../widgets/common/naql_button.dart';
+import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_shake_widget.dart';
+import '../../widgets/common/wasl_toast.dart';
 
 class TopUpScreen extends StatefulWidget {
   const TopUpScreen({super.key});
@@ -18,6 +20,7 @@ class TopUpScreen extends StatefulWidget {
 
 class _TopUpScreenState extends State<TopUpScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _shakeKey = GlobalKey<WaslShakeWidgetState>();
   final _amountController = TextEditingController();
   final _referenceController = TextEditingController();
 
@@ -31,7 +34,10 @@ class _TopUpScreenState extends State<TopUpScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      _shakeKey.currentState?.shake();
+      return;
+    }
     final auth = context.read<AuthProvider>();
     final wallet = context.read<WalletProvider>();
     if (auth.uid == null) return;
@@ -46,9 +52,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
     if (wallet.topUpSubmitted) {
       _showSuccessDialog();
     } else if (wallet.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(wallet.error!)),
-      );
+      WaslToast.show(context, wallet.error!, type: ToastType.error);
     }
   }
 
@@ -57,7 +61,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.card,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -74,17 +78,17 @@ class _TopUpScreenState extends State<TopUpScreen> {
                 .animate()
                 .scale(duration: 500.ms, curve: Curves.elasticOut),
             const SizedBox(height: 20),
-            Text('Demande envoyée !', style: AppTextStyles.h2,
-                textAlign: TextAlign.center),
+            Text('تم إرسال الطلب!',
+                style: AppTextStyles.h2, textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Votre recharge sera confirmée par l\'admin dans les 24h. Vérifiez l\'onglet Recharges.',
+              'سيتم تأكيد الشحن من قِبل الإدارة خلال 24 ساعة. تابع من تبويب الشحنات.',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            NaqlButton(
-              label: 'Retour au portefeuille',
+            WaslButton(
+              label: 'العودة للمحفظة',
               onPressed: () {
                 context.read<WalletProvider>().resetTopUpState();
                 Navigator.of(context).pop();
@@ -103,7 +107,15 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Recharger le portefeuille')),
+      appBar: AppBar(
+        title: Text('شحن المحفظة', style: AppTextStyles.h3),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -113,11 +125,12 @@ class _TopUpScreenState extends State<TopUpScreen> {
             children: [
               // Info banner
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                  color: AppColors.info.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border:
+                      Border.all(color: AppColors.info.withValues(alpha: 0.25)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,26 +140,25 @@ class _TopUpScreenState extends State<TopUpScreen> {
                         const Icon(Icons.info_outline_rounded,
                             color: AppColors.info, size: 20),
                         const SizedBox(width: 8),
-                        Text('Comment recharger ?',
+                        Text('كيف تشحن؟',
                             style: AppTextStyles.bodyLarge
                                 .copyWith(color: AppColors.info)),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     _StepRow(
-                        number: '1',
+                        number: '١',
                         text:
-                            'Effectuez un dépôt via CashPlus ou Wafacash au numéro admin'),
-                    const SizedBox(height: 6),
+                            'قم بإيداع المبلغ عبر CashPlus أو Wafacash على رقم الإدارة'),
+                    const SizedBox(height: 8),
                     _StepRow(
-                        number: '2',
-                        text:
-                            'Notez le numéro de référence de la transaction'),
-                    const SizedBox(height: 6),
+                        number: '٢',
+                        text: 'احتفظ برقم مرجع المعاملة'),
+                    const SizedBox(height: 8),
                     _StepRow(
-                        number: '3',
+                        number: '٣',
                         text:
-                            'Remplissez ce formulaire — l\'admin confirmera sous 24h'),
+                            'أدخل البيانات أدناه — ستؤكد الإدارة خلال 24 ساعة'),
                   ],
                 ),
               )
@@ -156,14 +168,15 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
               const SizedBox(height: 28),
 
-              // Amount
-              Text('Montant (MAD)', style: AppTextStyles.label),
-              const SizedBox(height: 8),
+              // Amount label
+              Text('المبلغ (درهم)', style: AppTextStyles.label),
+              const SizedBox(height: 10),
 
               // Quick-select chips
               Row(
                 children: _quickAmounts.map((amt) {
-                  final selected = _amountController.text == amt.toInt().toString();
+                  final selected =
+                      _amountController.text == amt.toInt().toString();
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(
@@ -171,7 +184,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
                         decoration: BoxDecoration(
                           color: selected
                               ? AppColors.primary
@@ -182,12 +195,23 @@ class _TopUpScreenState extends State<TopUpScreen> {
                                 ? AppColors.primary
                                 : AppColors.border,
                           ),
+                          boxShadow: selected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.25),
+                                    blurRadius: 8,
+                                  )
+                                ]
+                              : null,
                         ),
                         child: Text(
                           '${amt.toInt()}',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.body.copyWith(
-                            color: selected ? Colors.white : AppColors.textSecondary,
+                            color: selected
+                                ? Colors.white
+                                : AppColors.textSecondary,
                             fontWeight:
                                 selected ? FontWeight.w700 : FontWeight.w400,
                           ),
@@ -206,33 +230,33 @@ class _TopUpScreenState extends State<TopUpScreen> {
                     const TextInputType.numberWithOptions(decimal: false),
                 style: AppTextStyles.body,
                 decoration: const InputDecoration(
-                  hintText: 'Ou saisir un montant personnalisé',
-                  prefixIcon: Icon(Icons.payments_rounded,
-                      color: AppColors.primary),
-                  suffixText: 'MAD',
+                  hintText: 'أو أدخل مبلغاً مخصصاً',
+                  prefixIcon:
+                      Icon(Icons.payments_rounded, color: AppColors.primary),
+                  suffixText: 'درهم',
                 ),
                 validator: Validators.walletTopUp,
               )
                   .animate(delay: 100.ms)
                   .fadeIn(duration: 400.ms),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
 
               // Reference
-              Text('Numéro de référence', style: AppTextStyles.label),
-              const SizedBox(height: 8),
+              Text('رقم المرجع', style: AppTextStyles.label),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _referenceController,
                 style: AppTextStyles.body,
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
-                  hintText: 'Ex: REF-12345678',
-                  prefixIcon:
-                      Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                  hintText: 'مثال: REF-12345678',
+                  prefixIcon: Icon(Icons.receipt_long_rounded,
+                      color: AppColors.primary),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Numéro de référence requis';
+                    return 'رقم المرجع مطلوب';
                   }
                   return null;
                 },
@@ -240,16 +264,16 @@ class _TopUpScreenState extends State<TopUpScreen> {
                   .animate(delay: 150.ms)
                   .fadeIn(duration: 400.ms),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Contact admin reminder
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: AppColors.primary.withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.25)),
+                      color: AppColors.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -258,7 +282,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Des questions ? Contactez l\'admin WhatsApp pour confirmer votre dépôt.',
+                        'هل لديك سؤال؟ تواصل مع الإدارة عبر واتساب لتأكيد الإيداع.',
                         style: AppTextStyles.caption
                             .copyWith(color: AppColors.textSecondary),
                       ),
@@ -271,16 +295,19 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
               const SizedBox(height: 32),
 
-              NaqlButton(
-                label: 'Soumettre la demande',
-                onPressed: _submit,
-                isLoading: wallet.isLoading,
-                icon: Icons.send_rounded,
+              WaslShakeWidget(
+                key: _shakeKey,
+                child: WaslButton(
+                  label: 'إرسال الطلب',
+                  onPressed: _submit,
+                  isLoading: wallet.isLoading,
+                  icon: Icons.send_rounded,
+                ),
               )
                   .animate(delay: 250.ms)
                   .fadeIn(duration: 400.ms),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -292,7 +319,6 @@ class _TopUpScreenState extends State<TopUpScreen> {
 class _StepRow extends StatelessWidget {
   final String number;
   final String text;
-
   const _StepRow({required this.number, required this.text});
 
   @override
@@ -301,9 +327,9 @@ class _StepRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
+          width: 22,
+          height: 22,
+          decoration: const BoxDecoration(
             color: AppColors.info,
             shape: BoxShape.circle,
           ),

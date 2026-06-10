@@ -40,14 +40,18 @@ class AuthProvider extends ChangeNotifier {
         _user = null;
         _driver = null;
       } else {
-        final profile = await _authService.getUserProfile(firebaseUser.uid);
-        if (profile != null) {
-          _user = profile;
-          if (profile.type == AppConstants.userTypeDriver) {
-            _driver = await _firestoreService.getDriver(firebaseUser.uid);
+        try {
+          final profile = await _authService.getUserProfile(firebaseUser.uid);
+          if (profile != null) {
+            _user = profile;
+            if (profile.type == AppConstants.userTypeDriver) {
+              _driver = await _firestoreService.getDriver(firebaseUser.uid);
+            }
+            _status = AuthStatus.authenticated;
+          } else {
+            _status = AuthStatus.unauthenticated;
           }
-          _status = AuthStatus.authenticated;
-        } else {
+        } catch (_) {
           _status = AuthStatus.unauthenticated;
         }
       }
@@ -68,6 +72,56 @@ class AuthProvider extends ChangeNotifier {
         _setLoading(false);
       },
     );
+  }
+
+  Future<bool> signInWithGoogle() async {
+    _setLoading(true);
+    try {
+      final cred = await _authService.signInWithGoogle();
+      _setLoading(false);
+      return cred != null;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Returns null on success, Arabic error message on failure.
+  Future<String?> signInOrCreateWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _setLoading(true);
+    try {
+      await _authService.signInWithEmailPassword(
+          email: email, password: password);
+      _setLoading(false);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'INVALID_LOGIN_CREDENTIALS' ||
+          e.code == 'user-not-found') {
+        try {
+          await _authService.createUserWithEmailPassword(
+              email: email, password: password);
+          _setLoading(false);
+          return null;
+        } on FirebaseAuthException catch (e2) {
+          final msg = e2.code == 'email-already-in-use'
+              ? 'كلمة المرور غير صحيحة'
+              : (e2.message ?? 'حدث خطأ');
+          _error = msg;
+          _setLoading(false);
+          return msg;
+        }
+      }
+      final msg = e.message ?? 'حدث خطأ';
+      _error = msg;
+      _setLoading(false);
+      return msg;
+    }
   }
 
   Future<bool> verifyOtp(String code) async {
@@ -131,14 +185,16 @@ class AuthProvider extends ChangeNotifier {
   Future<void> loadCurrentUserProfile() async {
     final uid = _authService.currentUser?.uid;
     if (uid == null) return;
-    final profile = await _authService.getUserProfile(uid);
-    if (profile != null) {
-      _user = profile;
-      if (profile.type == AppConstants.userTypeDriver) {
-        _driver = await _firestoreService.getDriver(uid);
+    try {
+      final profile = await _authService.getUserProfile(uid);
+      if (profile != null) {
+        _user = profile;
+        if (profile.type == AppConstants.userTypeDriver) {
+          _driver = await _firestoreService.getDriver(uid);
+        }
+        _status = AuthStatus.authenticated;
       }
-      _status = AuthStatus.authenticated;
-    }
+    } catch (_) {}
     notifyListeners();
   }
 

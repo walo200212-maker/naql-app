@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -9,8 +10,9 @@ import '../../../data/models/job_model.dart';
 import '../../../data/models/offer_model.dart';
 import '../../../data/services/firestore_service.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/common/naql_button.dart';
 import '../../widgets/common/status_badge.dart';
+import '../../widgets/common/wasl_button.dart';
+import '../../widgets/common/wasl_toast.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -53,10 +55,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
-  double get _enteredPrice {
-    final v = double.tryParse(_priceController.text.trim());
-    return v ?? 0;
-  }
+  double get _enteredPrice =>
+      double.tryParse(_priceController.text.trim()) ?? 0;
 
   double get _commission => _enteredPrice * AppConstants.commissionRate;
 
@@ -68,12 +68,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final driver = auth.driver;
     if (driver == null) return;
 
-    // Guard: check wallet
     if (!driver.canAcceptJobs) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Solde insuffisant pour faire une offre')),
-      );
+      WaslToast.show(context, 'الرصيد غير كافٍ لتقديم عرض',
+          type: ToastType.error);
       return;
     }
 
@@ -91,9 +88,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        WaslToast.show(context, e.toString(), type: ToastType.error);
       }
     }
   }
@@ -112,9 +107,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (_job == null || _error != null) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const Text('Détail mission')),
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          title: Text('تفاصيل المهمة',
+              style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+        ),
         body: Center(
-          child: Text(_error ?? 'Mission introuvable',
+          child: Text(_error ?? 'المهمة غير موجودة',
               style: AppTextStyles.bodySecondary),
         ),
       );
@@ -127,16 +128,26 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Détail de la mission'),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: Text(
+          'تفاصيل المهمة',
+          style: GoogleFonts.cairo(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: StatusBadge(status: job.status),
+            padding: const EdgeInsets.only(left: 16),
+            child: Center(child: StatusBadge(status: job.status)),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -150,39 +161,40 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
             // Details card
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.surfaceBorder),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _DetailRow(
                     icon: Icons.straighten_rounded,
-                    label: 'Distance',
-                    value: '${job.distanceKm.toStringAsFixed(1)} km',
+                    label: 'المسافة',
+                    value: '${job.distanceKm.toStringAsFixed(1)} كم',
+                    valueColor: AppColors.primary,
                   ),
-                  const Divider(height: 20),
+                  Divider(color: AppColors.surfaceBorder, height: 20),
                   _DetailRow(
                     icon: Icons.location_city_rounded,
-                    label: 'Ville',
+                    label: 'المدينة',
                     value: job.city,
                   ),
                   if (job.isIntercity) ...[
-                    const Divider(height: 20),
+                    Divider(color: AppColors.surfaceBorder, height: 20),
                     _DetailRow(
                       icon: Icons.swap_horiz_rounded,
-                      label: 'Type',
-                      value: 'Intercity',
+                      label: 'النوع',
+                      value: 'بين المدن',
                       valueColor: AppColors.info,
                     ),
                   ],
                   if (job.itemsDescription.isNotEmpty) ...[
-                    const Divider(height: 20),
+                    Divider(color: AppColors.surfaceBorder, height: 20),
                     _DetailRow(
                       icon: Icons.inventory_2_rounded,
-                      label: 'Description',
+                      label: 'الوصف',
                       value: job.itemsDescription,
                     ),
                   ],
@@ -194,24 +206,24 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
             // Photos
             if (job.itemsPhotos.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text('Photos des articles', style: AppTextStyles.label),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
+              Text('صور البضائع', style: AppTextStyles.label),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 100,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: job.itemsPhotos.length,
-                  itemBuilder: (_, i) => Container(
+                  itemBuilder: (ctx, i) => Container(
                     margin: const EdgeInsets.only(right: 10),
                     width: 100,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       image: DecorationImage(
                         image: NetworkImage(job.itemsPhotos[i]),
                         fit: BoxFit.cover,
                       ),
-                      color: AppColors.surfaceVariant,
+                      color: AppColors.surfaceHigh,
                     ),
                   ),
                 ),
@@ -223,7 +235,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             // Offer section
             if (job.status == AppConstants.jobStatusOpen) ...[
               if (_offerSubmitted)
-                _OfferSentBanner()
+                const _OfferSentBanner()
               else
                 _OfferForm(
                   formKey: _formKey,
@@ -238,29 +250,32 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
+                  color: AppColors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.surfaceBorder),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.lock_rounded,
-                        color: AppColors.textSecondary),
+                        color: AppColors.textSecondary, size: 20),
                     const SizedBox(width: 12),
-                    Text(
-                      'Cette mission n\'est plus disponible pour les offres.',
-                      style: AppTextStyles.bodySecondary,
+                    Expanded(
+                      child: Text(
+                        'هذه المهمة لم تعد متاحة للعروض.',
+                        style: AppTextStyles.bodySecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-
-            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 }
+
+// ─── Route card ───────────────────────────────────────────────────────────────
 
 class _RouteCard extends StatelessWidget {
   final JobModel job;
@@ -269,48 +284,48 @@ class _RouteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Itinéraire', style: AppTextStyles.label),
-          const SizedBox(height: 14),
+          Text('المسار', style: AppTextStyles.label),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Timeline dots
               Column(
                 children: [
-                  const Icon(Icons.circle, color: AppColors.success, size: 12),
+                  const Icon(Icons.circle,
+                      color: AppColors.success, size: 12),
                   Container(
                     width: 2,
                     height: 40,
-                    color: AppColors.border,
+                    color: AppColors.surfaceBorder,
                     margin: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   const Icon(Icons.location_on_rounded,
                       color: AppColors.primary, size: 16),
                 ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Départ', style: AppTextStyles.caption),
+                    Text('الانطلاق', style: AppTextStyles.caption),
                     Text(
                       job.pickupLocation.address,
                       style: AppTextStyles.bodyLarge,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 20),
-                    Text('Arrivée', style: AppTextStyles.caption),
+                    const SizedBox(height: 22),
+                    Text('الوصول', style: AppTextStyles.caption),
                     Text(
                       job.dropoffLocation.address,
                       style: AppTextStyles.bodyLarge,
@@ -327,6 +342,8 @@ class _RouteCard extends StatelessWidget {
     );
   }
 }
+
+// ─── Detail row ───────────────────────────────────────────────────────────────
 
 class _DetailRow extends StatelessWidget {
   final IconData icon;
@@ -345,7 +362,7 @@ class _DetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 18),
+        Icon(icon, color: AppColors.primary, size: 17),
         const SizedBox(width: 10),
         Text(label, style: AppTextStyles.bodySecondary),
         const Spacer(),
@@ -360,6 +377,8 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+// ─── Offer form ───────────────────────────────────────────────────────────────
 
 class _OfferForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -390,68 +409,114 @@ class _OfferForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Soumettre votre offre', style: AppTextStyles.h3),
+          Text('قدم عرضك', style: AppTextStyles.h3),
           const SizedBox(height: 4),
           Text(
-            'Le client verra votre prix et choisira le meilleur chauffeur.',
+            'سيرى العميل سعرك ويختار أفضل سائق.',
             style: AppTextStyles.bodySecondary,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          TextFormField(
-            controller: priceController,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-            style: AppTextStyles.price.copyWith(fontSize: 22),
-            textAlign: TextAlign.center,
-            decoration: const InputDecoration(
-              hintText: '0',
-              prefixText: 'MAD  ',
-              suffixText: '  total',
+          // Price input
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGlow,
+                  blurRadius: 16,
+                ),
+              ],
             ),
-            onChanged: (_) => onChanged(),
-            validator: (v) {
-              final n = double.tryParse(v?.trim() ?? '');
-              if (n == null || n <= 0) return 'Entrez un prix valide';
-              if (n < 50) return 'Prix minimum 50 MAD';
-              return null;
-            },
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  'درهم',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Expanded(
+                  child: TextFormField(
+                    controller: priceController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      hintStyle: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textHint,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                    ),
+                    onChanged: (_) => onChanged(),
+                    validator: (v) {
+                      final n = double.tryParse(v?.trim() ?? '');
+                      if (n == null || n <= 0) return 'أدخل سعراً صالحاً';
+                      if (n < 50) return 'الحد الأدنى 50 درهم';
+                      return null;
+                    },
+                  ),
+                ),
+                Text(
+                  'الإجمالي',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           )
               .animate()
               .fadeIn(duration: 300.ms),
 
           const SizedBox(height: 16),
 
-          // Commission preview card
+          // Commission breakdown
           if (commission > 0)
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: willBeBlocked
                       ? AppColors.error.withValues(alpha: 0.4)
-                      : AppColors.border,
+                      : AppColors.surfaceBorder,
                 ),
               ),
               child: Column(
                 children: [
-                  _CommissionRow(
-                    label: 'Prix total (client paie)',
-                    value: '${priceController.text.trim()} MAD',
+                  _CommRow(
+                    label: 'السعر الإجمالي (يدفعه العميل)',
+                    value: '${priceController.text.trim()} درهم',
                     bold: true,
                   ),
-                  const Divider(height: 16),
-                  _CommissionRow(
-                    label: 'Commission NaqlApp (12%)',
-                    value: '- ${commission.toStringAsFixed(0)} MAD',
+                  Divider(color: AppColors.surfaceBorder, height: 16),
+                  _CommRow(
+                    label: 'عمولة وصل (12%)',
+                    value: '- ${commission.toStringAsFixed(0)} درهم',
                     color: AppColors.error,
                   ),
-                  const Divider(height: 16),
-                  _CommissionRow(
-                    label: 'Solde après commission',
-                    value: '${walletAfter.toStringAsFixed(0)} MAD',
+                  Divider(color: AppColors.surfaceBorder, height: 16),
+                  _CommRow(
+                    label: 'الرصيد بعد العمولة',
+                    value: '${walletAfter.toStringAsFixed(0)} درهم',
                     color: willBeBlocked ? AppColors.error : AppColors.success,
                     bold: true,
                   ),
@@ -463,7 +528,7 @@ class _OfferForm extends StatelessWidget {
                             color: AppColors.error, size: 14),
                         const SizedBox(width: 6),
                         Text(
-                          'Solde insuffisant après commission',
+                          'الرصيد غير كافٍ بعد العمولة',
                           style: AppTextStyles.caption
                               .copyWith(color: AppColors.error),
                         ),
@@ -478,8 +543,8 @@ class _OfferForm extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          NaqlButton(
-            label: 'Envoyer mon offre',
+          WaslButton(
+            label: 'إرسال عرضي',
             onPressed: willBeBlocked ? null : onSubmit,
             isLoading: isSubmitting,
             icon: Icons.send_rounded,
@@ -490,13 +555,13 @@ class _OfferForm extends StatelessWidget {
   }
 }
 
-class _CommissionRow extends StatelessWidget {
+class _CommRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
   final bool bold;
 
-  const _CommissionRow({
+  const _CommRow({
     required this.label,
     required this.value,
     this.color,
@@ -521,40 +586,55 @@ class _CommissionRow extends StatelessWidget {
   }
 }
 
+// ─── Offer sent banner ────────────────────────────────────────────────────────
+
 class _OfferSentBanner extends StatelessWidget {
   const _OfferSentBanner();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+        color: AppColors.success.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.check_circle_rounded,
-              color: AppColors.success, size: 44),
-          const SizedBox(height: 12),
-          Text('Offre envoyée !', style: AppTextStyles.h3),
-          const SizedBox(height: 6),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_rounded,
+                color: AppColors.success, size: 40),
+          )
+              .animate()
+              .scale(duration: 500.ms, curve: Curves.elasticOut),
+          const SizedBox(height: 16),
+          Text('تم إرسال عرضك! 🎉', style: AppTextStyles.h3),
+          const SizedBox(height: 8),
           Text(
-            'Le client examinera votre offre et vous contactera s\'il vous choisit.',
+            'سيراجع العميل عرضك وسيتصل بك إذا اختارك.',
             style: AppTextStyles.bodySecondary,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          OutlinedButton(
+          const SizedBox(height: 20),
+          WaslButton(
+            label: 'العودة للطلبات',
+            variant: WaslButtonVariant.outline,
             onPressed: () => context.pop(),
-            child: const Text('Retour aux missions'),
+            icon: Icons.arrow_back_rounded,
           ),
         ],
       ),
     )
         .animate()
-        .scale(duration: 500.ms, curve: Curves.elasticOut)
-        .fadeIn(duration: 300.ms);
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.1, end: 0);
   }
 }
