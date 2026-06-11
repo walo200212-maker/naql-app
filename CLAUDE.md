@@ -112,7 +112,7 @@ assets/fonts/
 - `app_constants.dart` — `truckTypes` values are French ('Petit camion' etc.)
 - `assets/animations/success.json` — missing, will crash if Lottie tries to load it
 - New user profile creation gap: after Google sign-in → userTypeSelect, no Firestore user doc is created until driver registration or some explicit save
-- Phone OTP: Morocco SMS needs to be enabled in Firebase Console → Authentication → Sign-in method
+- **Phone OTP with real numbers fails with `[BILLING_NOT_ENABLED]`**: Firebase Phone Auth SMS for non-test numbers requires the Blaze (pay-as-you-go) plan with a linked Cloud Billing account, even within the free SMS quota — this is a Firebase project-level requirement, not a code issue. Until Blaze is enabled, only the registered Firebase "test phone numbers" (Console → Authentication → Sign-in method → Phone → "Phone numbers for testing", e.g. `+212777029117` / `101269`) work for OTP testing.
 - Firebase phone auth rate-limits devices quickly during testing — add test phone numbers in Firebase Console to bypass
 - Settings → "اللغة" opens a language picker bottom sheet (`_showLanguageSheet` in `settings_screen.dart`) — only Arabic is active; French/English show a "قريباً" badge and toast (no real localization wired up yet)
 - **iOS Firebase not configured**: `firebase_options.dart` `ios` block is a placeholder (`appId: ...ios:000000000000000000000000`), no `GoogleService-Info.plist` in `ios/Runner/`, no Google Sign-In URL scheme in `Info.plist`. Needs `flutterfire configure` (or manual Firebase Console iOS app registration for bundle ID `com.naql.naqlApp`) before iOS builds can use Firebase.
@@ -123,6 +123,7 @@ assets/fonts/
 - Storage rules: need to allow driver doc uploads
 - Admin WhatsApp: `app_constants.dart` → `adminWhatsApp` (set real number before launch)
 - Android: `com.google.gms.google-services` Gradle plugin is applied (`android/settings.gradle.kts` + `android/app/build.gradle.kts`) — required for `google-services.json` to be processed (Google Sign-In etc.). Was missing before, now fixed.
+- **CI release signing**: `android/app/build.gradle.kts` release build type still uses `signingConfig = signingConfigs.getByName("debug")` (no dedicated release keystore yet). The GitHub Actions workflow (`.github/workflows/build.yml`) restores the dev's `~/.android/debug.keystore` from the `DEBUG_KEYSTORE_BASE64` repo secret before building, so CI-built APKs are signed with the same certificate registered in `google-services.json` (required for Google Sign-In to work in CI-built APKs). Don't remove this secret/step — without it, CI APKs get a random debug cert and Google Sign-In fails with `ApiException: 10`. Before a real Play Store release, generate a proper release keystore, register its SHA fingerprints with Firebase, and replace this setup.
 
 ## Commission model
 - `commissionRate: 0.12` (12%)
