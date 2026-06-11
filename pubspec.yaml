@@ -24,6 +24,8 @@ dependencies:
   geolocator: ^13.0.1
   geocoding: ^3.0.0
   geoflutterfire_plus: ^0.0.22
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # State Management
   provider: ^6.1.2

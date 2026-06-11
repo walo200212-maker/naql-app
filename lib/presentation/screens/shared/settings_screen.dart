@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/common/wasl_toast.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -92,7 +93,7 @@ class SettingsScreen extends StatelessWidget {
             label: 'اللغة',
             trailing: const Text('العربية',
                 style: TextStyle(color: AppColors.textSecondary)),
-            onTap: () {},
+            onTap: () => _showLanguageSheet(context),
           ),
 
           const SizedBox(height: 16),
@@ -170,6 +171,98 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 40),
         ],
       ),
+    );
+  }
+}
+
+void _showLanguageSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text('اختر اللغة', style: AppTextStyles.h3),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _LanguageOption(
+              label: 'العربية',
+              selected: true,
+              onTap: () => Navigator.pop(ctx),
+            ),
+            _LanguageOption(
+              label: 'Français',
+              onTap: () {
+                Navigator.pop(ctx);
+                WaslToast.show(context, 'هذه اللغة غير متاحة بعد',
+                    type: ToastType.info);
+              },
+            ),
+            _LanguageOption(
+              label: 'English',
+              onTap: () {
+                Navigator.pop(ctx);
+                WaslToast.show(context, 'هذه اللغة غير متاحة بعد',
+                    type: ToastType.info);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _LanguageOption extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LanguageOption({
+    required this.label,
+    this.selected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      title: Text(label, style: AppTextStyles.body),
+      trailing: selected
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+          : Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('قريباً',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textHint)),
+            ),
     );
   }
 }

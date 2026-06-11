@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' hide Marker;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as ll;
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -27,6 +29,7 @@ class ClientHomeScreen extends StatefulWidget {
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   GoogleMapController? _mapController;
+  final MapController _webMapController = MapController();
   LatLng _center = const LatLng(33.5731, -7.5898); // Casablanca default
   int _selectedTab = 0;
 
@@ -66,6 +69,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   void _goToMyLocation() {
     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_center, 15));
+    try {
+      _webMapController.move(ll.LatLng(_center.latitude, _center.longitude), 15);
+    } catch (_) {}
   }
 
   @override
@@ -85,6 +91,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 locationEnabled: _locationGranted,
                 onMapCreated: (c) => _mapController = c,
                 onMyLocation: _goToMyLocation,
+                webMapController: _webMapController,
               ),
               const _ProfileTab(),
             ],
@@ -137,21 +144,23 @@ class _HomeTab extends StatelessWidget {
   final bool locationEnabled;
   final void Function(GoogleMapController) onMapCreated;
   final VoidCallback onMyLocation;
+  final MapController webMapController;
 
   const _HomeTab({
     required this.center,
     required this.locationEnabled,
     required this.onMapCreated,
     required this.onMyLocation,
+    required this.webMapController,
   });
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Full-screen map (placeholder on web, real map on mobile)
+        // OpenStreetMap on web (no billing needed), Google Maps on mobile
         if (kIsWeb)
-          _WebMapPlaceholder()
+          _WebMap(center: center, controller: webMapController)
         else
           GoogleMap(
             initialCameraPosition: CameraPosition(target: center, zoom: 13),
@@ -241,35 +250,53 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
-class _WebMapPlaceholder extends StatelessWidget {
+class _WebMap extends StatelessWidget {
+  final LatLng center;
+  final MapController controller;
+
+  const _WebMap({required this.center, required this.controller});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: const Color(0xFF141414),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.primaryGlow,
-                shape: BoxShape.circle,
+    final point = ll.LatLng(center.latitude, center.longitude);
+    return FlutterMap(
+      mapController: controller,
+      options: MapOptions(
+        initialCenter: point,
+        initialZoom: 13,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+          subdomains: const ['a', 'b', 'c', 'd'],
+          userAgentPackageName: 'com.wasl.naql_app',
+          retinaMode: true,
+        ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: point,
+              width: 40,
+              height: 40,
+              child: const Icon(
+                Icons.location_on_rounded,
+                color: AppColors.primary,
+                size: 40,
               ),
-              child: const Icon(Icons.map_outlined,
-                  color: AppColors.primary, size: 34),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'الخريطة متاحة على التطبيق',
-              style: AppTextStyles.bodySecondary,
             ),
           ],
         ),
-      ),
+        const RichAttributionWidget(
+          attributions: [
+            TextSourceAttribution('© OpenStreetMap contributors'),
+            TextSourceAttribution('© CARTO'),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -427,6 +454,7 @@ class _ProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final loggedIn = auth.uid != null;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -469,14 +497,25 @@ class _ProfileTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  auth.user?.name ?? 'عميل',
+                  loggedIn ? (auth.user?.name ?? 'عميل') : 'زائر',
                   style: AppTextStyles.h2,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  auth.user?.phone ?? '',
+                  loggedIn
+                      ? (auth.user?.phone ?? '')
+                      : 'سجل الدخول للوصول إلى حسابك وطلباتك',
                   style: AppTextStyles.bodySecondary,
+                  textAlign: TextAlign.center,
                 ),
+                if (!loggedIn) ...[
+                  const SizedBox(height: 16),
+                  WaslButton(
+                    label: 'تسجيل الدخول',
+                    icon: Icons.login_rounded,
+                    onPressed: () => context.go(AppRoutes.login),
+                  ),
+                ],
               ],
             ),
           )
@@ -502,22 +541,23 @@ class _ProfileTab extends StatelessWidget {
             ],
           ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
 
-          const SizedBox(height: 12),
-
-          _MenuSection(
-            title: 'الحساب',
-            items: [
-              _MenuItemData(
-                icon: Icons.logout_rounded,
-                label: 'تسجيل الخروج',
-                color: AppColors.error,
-                onTap: () async {
-                  await auth.signOut();
-                  if (context.mounted) context.go(AppRoutes.login);
-                },
-              ),
-            ],
-          ).animate(delay: 150.ms).fadeIn(duration: 400.ms),
+          if (loggedIn) ...[
+            const SizedBox(height: 12),
+            _MenuSection(
+              title: 'الحساب',
+              items: [
+                _MenuItemData(
+                  icon: Icons.logout_rounded,
+                  label: 'تسجيل الخروج',
+                  color: AppColors.error,
+                  onTap: () async {
+                    await auth.signOut();
+                    if (context.mounted) context.go(AppRoutes.login);
+                  },
+                ),
+              ],
+            ).animate(delay: 150.ms).fadeIn(duration: 400.ms),
+          ],
         ],
       ),
     );

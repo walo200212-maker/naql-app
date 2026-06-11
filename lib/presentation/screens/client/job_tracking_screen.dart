@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart' as fm;
+import 'package:latlong2/latlong.dart' as ll;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
@@ -387,6 +390,7 @@ class _LiveDriverMap extends StatefulWidget {
 
 class _LiveDriverMapState extends State<_LiveDriverMap> {
   GoogleMapController? _mapController;
+  final fm.MapController _webMapController = fm.MapController();
 
   @override
   Widget build(BuildContext context) {
@@ -410,7 +414,60 @@ class _LiveDriverMapState extends State<_LiveDriverMap> {
                 driverPos = LatLng(geo.latitude, geo.longitude);
                 _mapController
                     ?.animateCamera(CameraUpdate.newLatLng(driverPos));
+                try {
+                  _webMapController.move(
+                      ll.LatLng(driverPos.latitude, driverPos.longitude), 14);
+                } catch (_) {}
               }
+            }
+
+            if (kIsWeb) {
+              final center = driverPos ?? dropoff;
+              return fm.FlutterMap(
+                mapController: _webMapController,
+                options: fm.MapOptions(
+                  initialCenter: ll.LatLng(center.latitude, center.longitude),
+                  initialZoom: 14,
+                  interactionOptions: const fm.InteractionOptions(
+                    flags: fm.InteractiveFlag.all & ~fm.InteractiveFlag.rotate,
+                  ),
+                ),
+                children: [
+                  fm.TileLayer(
+                    urlTemplate:
+                        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                    subdomains: const ['a', 'b', 'c', 'd'],
+                    userAgentPackageName: 'com.wasl.naql_app',
+                    retinaMode: true,
+                  ),
+                  fm.MarkerLayer(
+                    markers: [
+                      if (driverPos != null)
+                        fm.Marker(
+                          point: ll.LatLng(
+                              driverPos.latitude, driverPos.longitude),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.local_shipping_rounded,
+                              color: AppColors.primary, size: 32),
+                        ),
+                      fm.Marker(
+                        point: ll.LatLng(dropoff.latitude, dropoff.longitude),
+                        width: 36,
+                        height: 36,
+                        child: const Icon(Icons.location_on_rounded,
+                            color: AppColors.success, size: 32),
+                      ),
+                    ],
+                  ),
+                  const fm.RichAttributionWidget(
+                    attributions: [
+                      fm.TextSourceAttribution('© OpenStreetMap contributors'),
+                      fm.TextSourceAttribution('© CARTO'),
+                    ],
+                  ),
+                ],
+              );
             }
 
             return GoogleMap(

@@ -10,7 +10,8 @@ Truck moving marketplace for Morocco. Clients post moving jobs, drivers bid on t
 - **Provider** `^6.1.2` — state management
 - **google_fonts**, **flutter_animate** — UI
 - **http** `^1.2.2` — Nominatim geocoding
-- **google_maps_flutter** — mobile only (web uses placeholder)
+- **google_maps_flutter** — mobile only
+- **flutter_map** `^7.0.2` + **latlong2** `^0.9.1` — web maps (OSM/CARTO, no API key needed)
 
 ## Running the app
 ```
@@ -82,8 +83,11 @@ lib/
 
 ## Maps
 - **Mobile**: Google Maps (`google_maps_flutter`) — works fine, has API key
-- **Web**: Shows dark placeholder widget (`_WebMapPlaceholder`) — Google Maps requires billing on web, intentionally skipped
-- Uses `kIsWeb` check in `client_home_screen.dart`
+- **Web**: Real interactive map via `flutter_map` (CartoDB dark tiles, OSM attribution) — free, no billing, no API key
+- `kIsWeb` branch in both:
+  - `client_home_screen.dart` — `_WebMap` (home tab map), uses `MapController`
+  - `job_tracking_screen.dart` — `_LiveDriverMap` (`_LiveDriverMapState`), uses `fm.MapController` (flutter_map aliased as `fm` since `Marker`/etc. collide with `google_maps_flutter`)
+- Live driver tracking already real-time via Firestore `drivers/{id}.location` (`GeoPoint`) stream from `AuthProvider._startLocationStream` — `_LiveDriverMap` only renders when `job.status == inProgress` and `matchedDriverId != null`
 
 ## Address autocomplete (post job screen)
 - Uses **OpenStreetMap Nominatim** — free, no API key, no billing
@@ -110,12 +114,15 @@ assets/fonts/
 - New user profile creation gap: after Google sign-in → userTypeSelect, no Firestore user doc is created until driver registration or some explicit save
 - Phone OTP: Morocco SMS needs to be enabled in Firebase Console → Authentication → Sign-in method
 - Firebase phone auth rate-limits devices quickly during testing — add test phone numbers in Firebase Console to bypass
+- Settings → "اللغة" opens a language picker bottom sheet (`_showLanguageSheet` in `settings_screen.dart`) — only Arabic is active; French/English show a "قريباً" badge and toast (no real localization wired up yet)
+- **iOS Firebase not configured**: `firebase_options.dart` `ios` block is a placeholder (`appId: ...ios:000000000000000000000000`), no `GoogleService-Info.plist` in `ios/Runner/`, no Google Sign-In URL scheme in `Info.plist`. Needs `flutterfire configure` (or manual Firebase Console iOS app registration for bundle ID `com.naql.naqlApp`) before iOS builds can use Firebase.
 
 ## Firebase project
 - Project ID: `naql-bc9e3`
 - Auth methods: Phone, Email/Password, Google
 - Storage rules: need to allow driver doc uploads
 - Admin WhatsApp: `app_constants.dart` → `adminWhatsApp` (set real number before launch)
+- Android: `com.google.gms.google-services` Gradle plugin is applied (`android/settings.gradle.kts` + `android/app/build.gradle.kts`) — required for `google-services.json` to be processed (Google Sign-In etc.). Was missing before, now fixed.
 
 ## Commission model
 - `commissionRate: 0.12` (12%)

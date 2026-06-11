@@ -31,7 +31,7 @@ class _PasswordScreenState extends State<PasswordScreen> {
   }
 
   Future<void> _onContinue() async {
-    final password = _passwordCtrl.text;
+    final password = _passwordCtrl.text.trim();
     if (password.length < 6) {
       _shakeKey.currentState?.shake();
       WaslToast.show(

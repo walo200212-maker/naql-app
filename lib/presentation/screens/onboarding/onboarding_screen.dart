@@ -77,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeOutCubic,
       );
     } else {
-      context.go(AppRoutes.login);
+      context.go(AppRoutes.clientHome);
     }
   }
 
@@ -95,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => context.go(AppRoutes.login),
+                    onPressed: () => context.go(AppRoutes.clientHome),
                     child: Text(
                       'تخطي',
                       style: AppTextStyles.body.copyWith(

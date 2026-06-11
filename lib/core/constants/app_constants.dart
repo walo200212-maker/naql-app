@@ -20,6 +20,10 @@ class AppConstants {
   static const String truckPhotosPath = 'truck_photos';
   static const String jobPhotosPath = 'job_photos';
 
+  // Cloudinary (free image hosting — no Firebase Blaze plan required)
+  static const String cloudinaryCloudName = 'dmtlm9ltn';
+  static const String cloudinaryUploadPreset = 'naql_uploads';
+
   // Truck types
   static const List<String> truckTypes = ['Petit camion', 'Camion moyen', 'Grand camion'];
 
